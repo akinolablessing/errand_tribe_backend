@@ -1,62 +1,95 @@
-from rest_framework import status, generics, permissions
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
+
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenRefreshView
-from django.contrib.auth import login
-from django.utils import timezone
+import json
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
 from django.db import transaction
 from .models import User
+from .utils import send_email_otp, send_sms_otp, generate_otp, set_verification_tokens
+
+from django.utils import timezone
+
+
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer,
     EmailVerificationSerializer, PhoneVerificationSerializer,
-    UserProfileSerializer, PasswordChangeSerializer
+    UserProfileSerializer
 )
 from .utils import (
-    generate_otp, send_verification_email, send_verification_sms,
-    set_verification_tokens, is_token_expired
+  send_verification_email, send_verification_sms,
+     is_token_expired
 )
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class UserRegistrationView(generics.CreateAPIView):
 
+@csrf_exempt
+def send_otp(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    email = data.get("email")
+    if not email:
+        return JsonResponse({"error": "Email is required"}, status=400)
+
+    send_email_otp(email)
+    return JsonResponse({"message": "OTP sent successfully to email"})
+
+
+
+class UserRegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
 
-        with transaction.atomic():
-            user = serializer.save()
+            with transaction.atomic():
+                user = serializer.save()
 
-            email_otp = generate_otp()
-            phone_otp = generate_otp()
+                email_otp = send_email_otp(user.email)
+                phone_otp = send_sms_otp(str(user.phone_number))
 
+                # Store OTPs for verification
+                set_verification_tokens(user, email_otp, phone_otp)
 
-            set_verification_tokens(user, email_otp, phone_otp)
+                # Return success response
+                return Response(
+                    {
+                        'success': True,
+                        'message': 'Registration successful. Please verify your email and phone.',
+                        'data': {
+                            'user_id': user.id,
+                            'email': user.email,
+                            'phone_number': str(user.phone_number),
+                            'verification_sent': {
+                                'email': True,
+                                'sms': True
+                            }
+                        }
+                    },
+                    status=status.HTTP_201_CREATED
+                )
 
-            email_sent = send_verification_email(user, email_otp)
-            sms_sent = send_verification_sms(user, phone_otp)
-
-            return Response({
-                'success': True,
-                'message': 'Registration successful. Please verify your email and phone.',
-                'data': {
-                    'user_id': user.id,
-                    'email': user.email,
-                    'phone_number': str(user.phone_number),
-                    'verification_sent': {
-                        'email': email_sent,
-                        'sms': sms_sent
-                    }
-                }
-            }, status=status.HTTP_201_CREATED)
-
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class UserLoginView(generics.GenericAPIView):
 
@@ -208,3 +241,47 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
+# Temporary in-memory storage (better to save in DB for production)
+otp_storage = {}
+
+# @csrf_exempt
+# def send_otp(request):
+#     if request.method == "POST":
+#         data = json.loads(request.body)
+#         email = data.get("email")
+#
+#         if not email:
+#             return JsonResponse({"error": "Email is required"}, status=400)
+#
+#         otp = generate_otp()
+#         otp_storage[email] = otp   # Save OTP temporarily
+#
+#         subject = "Your OTP Code"
+#         message = f"Your OTP code is {otp}. It will expire in 5 minutes."
+#
+#         send_mail(subject, message, settings.EMAIL_HOST_USER, [email])
+#
+#         return JsonResponse({"message": "OTP sent successfully to email"})
+#
+#     return JsonResponse({"error": "Invalid request method"}, status=405)
+#
+
+@csrf_exempt
+def verify_otp(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        email = data.get("email")
+        otp = data.get("otp")
+
+        if not email or not otp:
+            return JsonResponse({"error": "Email and OTP are required"}, status=400)
+
+        if otp_storage.get(email) == otp:
+            del otp_storage[email]
+            return JsonResponse({"message": "OTP verified successfully"})
+        else:
+            return JsonResponse({"error": "Invalid or expired OTP"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)

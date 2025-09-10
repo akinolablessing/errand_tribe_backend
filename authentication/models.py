@@ -1,9 +1,27 @@
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin,BaseUserManager
 from django.db import models
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
-from .managers import UserManager
+# from .managers import UserManager
 import uuid
+
+class UserManager(BaseUserManager):
+    def create_user(self, email, phone_number, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Users must have an email address')
+        if not phone_number:
+            raise ValueError('Users must have a phone number')
+
+        email = self.normalize_email(email)
+        user = self.model(email=email, phone_number=phone_number, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, phone_number, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, phone_number, password, **extra_fields)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -91,7 +109,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         return None
 
     def update_verification_status(self):
-        """Update overall verification status based on email and phone verification"""
         self.is_verified = self.email_verified and self.phone_verified
         self.save(update_fields=['is_verified'])
 
