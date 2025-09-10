@@ -96,11 +96,11 @@ WSGI_APPLICATION = 'ErrandTribe.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT', cast=int),
+        'NAME': "errand_tribe_database",
+        'USER': "root",
+        'PASSWORD': "Ayodeji@312",
+        'HOST': "localhost",
+        'PORT': 3306,
     }
 }
 
@@ -165,7 +165,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler'
+    # 'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler'
 }
 
 # JWT Configuration

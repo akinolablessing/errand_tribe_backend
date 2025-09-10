@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="errandTribeDatabase" uuid="58925ad5-4ff4-48be-84de-5c2478b943d6">
+    <data-source source="LOCAL" name="@localhost" uuid="853b9e23-174a-4017-a774-87ecca538767">
       <driver-ref>mysql.8</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>com.mysql.cj.jdbc.Driver</jdbc-driver>

@@ -1,19 +1,48 @@
-import random
-import string
-from django.core.mail import send_mail
-from django.conf import settings
 from django.utils import timezone
-from datetime import timedelta
 from twilio.rest import Client
 import logging
+import random
+from django.core.mail import send_mail
+from django.conf import settings
+
 
 logger = logging.getLogger(__name__)
 
 
-def generate_otp(length=6):
-    """Generate a random OTP of specified length"""
-    return ''.join(random.choices(string.digits, k=length))
 
+def generate_otp():
+    return str(random.randint(100000, 999999))
+
+
+
+otp_storage = {}
+
+
+def send_email_otp(email):
+    """Generate and send OTP to email, store in otp_storage."""
+    otp = generate_otp()
+    otp_storage[email] = otp  # save OTP temporarily
+
+    subject = "Your OTP Code"
+    message = f"Your OTP code is {otp}. It will expire in 5 minutes."
+    send_mail(subject, message, settings.EMAIL_HOST_USER, [email])
+
+    return otp
+
+def send_sms_otp(phone_number):
+    """Generate and send OTP to phone (stub or via SMS provider)."""
+    otp = generate_otp()
+    otp_storage[phone_number] = otp  # save OTP temporarily
+
+    # Here you would integrate with your SMS provider
+    print(f"Sending SMS OTP {otp} to {phone_number}")
+
+    return otp
+
+def set_verification_tokens(user, email_otp, phone_otp):
+    user.email_verification_code = email_otp
+    user.phone_verification_code = phone_otp
+    user.save()
 
 def send_verification_email(user, otp):
     """Send email verification OTP to user"""
@@ -62,23 +91,23 @@ def send_verification_sms(user, otp):
         return False
 
 
-def set_verification_tokens(user, email_otp=None, phone_otp=None):
-    """Set verification tokens for user with expiration"""
-    expiry_time = timezone.now() + timedelta(minutes=10)
-
-    if email_otp:
-        user.email_verification_token = email_otp
-        user.email_token_expires = expiry_time
-
-    if phone_otp:
-        user.phone_verification_token = phone_otp
-        user.phone_token_expires = expiry_time
-
-    user.save(update_fields=[
-        'email_verification_token', 'email_token_expires',
-        'phone_verification_token', 'phone_token_expires'
-    ])
-
+# def set_verification_tokens(user, email_otp=None, phone_otp=None):
+#     """Set verification tokens for user with expiration"""
+#     expiry_time = timezone.now() + timedelta(minutes=10)
+#
+#     if email_otp:
+#         user.email_verification_token = email_otp
+#         user.email_token_expires = expiry_time
+#
+#     if phone_otp:
+#         user.phone_verification_token = phone_otp
+#         user.phone_token_expires = expiry_time
+#
+#     user.save(update_fields=[
+#         'email_verification_token', 'email_token_expires',
+#         'phone_verification_token', 'phone_token_expires'
+#     ])
+#
 
 def is_token_expired(token_expires):
     if not token_expires:
