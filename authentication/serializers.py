@@ -70,12 +70,25 @@ class UserLoginSerializer(serializers.Serializer):
 
 
 class EmailVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
     code = serializers.CharField(max_length=6, min_length=6)
 
     def validate_code(self, value):
         if not value.isdigit():
-            raise serializers.ValidationError("Verification code must be numeric.")
+            raise serializers.ValidationError(
+                "Verification code must contain only numbers."
+            )
         return value
+
+    def validate(self, data):
+        email = data.get("email")
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "No user found with this email."})
+
+        data["user"] = user
+        return data
 
 
 class PhoneVerificationSerializer(serializers.Serializer):

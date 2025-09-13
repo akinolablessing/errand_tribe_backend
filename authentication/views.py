@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from django.db import transaction
 from .models import User
 from .utils import send_email_otp, send_sms_otp, generate_otp, set_verification_tokens
-
 from django.utils import timezone
 
 
@@ -18,7 +17,6 @@ from .serializers import (
     UserProfileSerializer
 )
 from .utils import (
-  send_verification_email, send_verification_sms,
      is_token_expired
 )
 import logging
@@ -59,13 +57,11 @@ class UserRegistrationView(generics.CreateAPIView):
             with transaction.atomic():
                 user = serializer.save()
 
-                email_otp = send_email_otp(user.email)
-                phone_otp = send_sms_otp(str(user.phone_number))
+                email_otp = send_email_otp(user)
+                phone_otp = send_sms_otp(user)
 
-                # Store OTPs for verification
                 set_verification_tokens(user, email_otp, phone_otp)
 
-                # Return success response
                 return Response(
                     {
                         'success': True,
@@ -120,46 +116,52 @@ class UserLoginView(generics.GenericAPIView):
         }, status=status.HTTP_200_OK)
 
 
+def is_token_expired(expiry_time):
+    """Check if a token has expired."""
+    return expiry_time and timezone.now() > expiry_time
+
+
 class EmailVerificationView(generics.GenericAPIView):
-    """Email verification endpoint"""
     serializer_class = EmailVerificationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]   # anyone can verify
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = request.user
+        email = serializer.validated_data['email']
         code = serializer.validated_data['code']
 
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {"success": False, "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         if user.email_verified:
-            return Response({
-                'success': False,
-                'message': 'Email already verified'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"success": False, "message": "Email already verified"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        if (user.email_verification_token != code or
-                is_token_expired(user.email_token_expires)):
-            return Response({
-                'success': False,
-                'message': 'Invalid or expired verification code'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if not user.verify_email_otp(code):
+            return Response({"success": False, "message": "Invalid or expired verification code"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # Verify email
-        user.email_verified = True
-        user.email_verification_token = None
-        user.email_token_expires = None
-        user.update_verification_status()
 
-        return Response({
-            'success': True,
-            'message': 'Email verified successfully',
-            'data': {
-                'email_verified': True,
-                'is_fully_verified': user.is_verified
-            }
-        }, status=status.HTTP_200_OK)
-
+        return Response(
+            {
+                "success": True,
+                "message": "Email verified successfully",
+                "data": {
+                    "email_verified": True,
+                    "is_fully_verified": getattr(user, "is_verified", True)
+                }
+            },
+            status=status.HTTP_200_OK
+        )
 
 class PhoneVerificationView(generics.GenericAPIView):
 

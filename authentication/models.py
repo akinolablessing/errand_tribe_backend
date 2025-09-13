@@ -1,8 +1,9 @@
+from datetime import timedelta
+
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin,BaseUserManager
 from django.db import models
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
-# from .managers import UserManager
 import uuid
 
 class UserManager(BaseUserManager):
@@ -81,6 +82,43 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name', 'phone_number']
 
+    def set_email_otp(self, otp, expiry_minutes=10):
+        self.email_verification_token = otp
+        self.email_token_expires = timezone.now() + timedelta(minutes=expiry_minutes)
+        self.save(update_fields=["email_verification_token", "email_token_expires"])
+
+    def verify_email_otp(self, otp):
+        if (
+                self.email_verification_token == otp
+                and self.email_token_expires
+                and self.email_token_expires > timezone.now()
+        ):
+            self.email_verified = True
+            self.email_verification_token = None
+            self.email_token_expires = None
+            self.save(update_fields=["email_verified", "email_verification_token", "email_token_expires"])
+            return True
+        return False
+
+    def set_sms_otp(self, otp, expiry_minutes=10):
+        self.phone_verification_token = otp
+        self.phone_token_expires = timezone.now() + timedelta(minutes=expiry_minutes)
+        self.save(update_fields=["phone_verification_token", "phone_token_expires"])
+
+    def verify_sms_otp(self, otp):
+
+        if (
+                self.phone_verification_token == otp
+                and self.phone_token_expires
+                and self.phone_token_expires > timezone.now()
+        ):
+            self.phone_verified = True
+            self.phone_verification_token = None
+            self.phone_token_expires = None
+            self.save(update_fields=["phone_verified", "phone_verification_token", "phone_token_expires"])
+            return True
+        return False
+
     class Meta:
         db_table = 'auth_user'
         verbose_name = 'User'
@@ -91,6 +129,8 @@ class User(AbstractBaseUser, PermissionsMixin):
             models.Index(fields=['role']),
             models.Index(fields=['is_verified']),
         ]
+
+
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
@@ -118,7 +158,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         return None
 
     def has_complete_profile(self):
-        """Check if user has completed their profile"""
         return all([
             self.first_name,
             self.last_name,
