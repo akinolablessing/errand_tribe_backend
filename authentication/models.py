@@ -1,190 +1,62 @@
-from datetime import timedelta
-
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin,BaseUserManager
+import uuid
+from django.contrib.auth.models import BaseUserManager, AbstractUser
 from django.db import models
 from django.utils import timezone
-from phonenumber_field.modelfields import PhoneNumberField
-import uuid
 
-class UserManager(BaseUserManager):
-    def create_user(self, email, phone_number, password=None, **extra_fields):
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
         if not email:
-            raise ValueError('Users must have an email address')
-        if not phone_number:
-            raise ValueError('Users must have a phone number')
-
+            raise ValueError("The Email field must be set")
         email = self.normalize_email(email)
-        user = self.model(email=email, phone_number=phone_number, **extra_fields)
+        user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, phone_number, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        return self.create_user(email, phone_number, password, **extra_fields)
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_active", True)
+
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
+
+        return self.create_user(email, password, **extra_fields)
 
 
-class User(AbstractBaseUser, PermissionsMixin):
-    ROLE_CHOICES = [
-        ('Requester', 'Requester'),
-        ('Runner', 'Runner'),
-        ('Admin', 'Admin'),
-    ]
-
+class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(unique=True, db_index=True)
-    phone_number = PhoneNumberField(unique=True, db_index=True)
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Requester')
-
-    profile_picture = models.ImageField(
-        upload_to='profile_pictures/',
+    username = None
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    role = models.CharField(
+        max_length=10,
+        choices=[("runner", "Runner"), ("tasker", "Tasker")],
         null=True,
         blank=True,
-        help_text="Profile picture for user"
     )
+    email_otp = models.CharField(max_length=6, null=True, blank=True)
+    email_otp_created_at = models.DateTimeField(null=True, blank=True)
+    is_email_verified = models.BooleanField(default=False)  # 🔑 required for login
 
-    location_city = models.CharField(max_length=100, null=True, blank=True)
-    location_latitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True
-    )
-    location_longitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True
-    )
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name", "phone_number"]
+    objects = CustomUserManager()
 
-    is_verified = models.BooleanField(default=False)
-    email_verified = models.BooleanField(default=False)
-    phone_verified = models.BooleanField(default=False)
+    def set_email_otp(self, otp: str):
+        self.email_otp = otp
+        self.email_otp_created_at = timezone.now()
+        self.save()
 
-    email_verification_token = models.CharField(max_length=6, null=True, blank=True)
-    phone_verification_token = models.CharField(max_length=6, null=True, blank=True)
-    email_token_expires = models.DateTimeField(null=True, blank=True)
-    phone_token_expires = models.DateTimeField(null=True, blank=True)
-
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
-    date_joined = models.DateTimeField(default=timezone.now)
-    last_login = models.DateTimeField(null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    objects = UserManager()
-
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name', 'phone_number']
-
-    def set_email_otp(self, otp, expiry_minutes=10):
-        self.email_verification_token = otp
-        self.email_token_expires = timezone.now() + timedelta(minutes=expiry_minutes)
-        self.save(update_fields=["email_verification_token", "email_token_expires"])
-
-    def verify_email_otp(self, otp):
+    def verify_email_otp(self, otp: str, expiry_seconds: int = 600) -> bool:
         if (
-                self.email_verification_token == otp
-                and self.email_token_expires
-                and self.email_token_expires > timezone.now()
+            self.email_otp == otp
+            and (timezone.now() - self.email_otp_created_at).seconds < expiry_seconds
         ):
-            self.email_verified = True
-            self.email_verification_token = None
-            self.email_token_expires = None
-            self.save(update_fields=["email_verified", "email_verification_token", "email_token_expires"])
+            self.is_email_verified = True
+            self.email_otp = None
+            self.save()
             return True
         return False
-
-    def set_sms_otp(self, otp, expiry_minutes=10):
-        self.phone_verification_token = otp
-        self.phone_token_expires = timezone.now() + timedelta(minutes=expiry_minutes)
-        self.save(update_fields=["phone_verification_token", "phone_token_expires"])
-
-    def verify_sms_otp(self, otp):
-
-        if (
-                self.phone_verification_token == otp
-                and self.phone_token_expires
-                and self.phone_token_expires > timezone.now()
-        ):
-            self.phone_verified = True
-            self.phone_verification_token = None
-            self.phone_token_expires = None
-            self.save(update_fields=["phone_verified", "phone_verification_token", "phone_token_expires"])
-            return True
-        return False
-
-    class Meta:
-        db_table = 'auth_user'
-        verbose_name = 'User'
-        verbose_name_plural = 'Users'
-        indexes = [
-            models.Index(fields=['email']),
-            models.Index(fields=['phone_number']),
-            models.Index(fields=['role']),
-            models.Index(fields=['is_verified']),
-        ]
-
-
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.email})"
-
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}".strip()
-
-    @property
-    def location_coordinates(self):
-        if self.location_latitude and self.location_longitude:
-            return {
-                'latitude': float(self.location_latitude),
-                'longitude': float(self.location_longitude)
-            }
-        return None
-
-    def update_verification_status(self):
-        self.is_verified = self.email_verified and self.phone_verified
-        self.save(update_fields=['is_verified'])
-
-    def get_profile_picture_url(self):
-        if self.profile_picture:
-            return self.profile_picture.url
-        return None
-
-    def has_complete_profile(self):
-        return all([
-            self.first_name,
-            self.last_name,
-            self.email,
-            self.phone_number,
-            self.is_verified
-        ])
-
-
-class RefreshToken(models.Model):
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refresh_tokens')
-    token = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
-    is_blacklisted = models.BooleanField(default=False)
-
-    class Meta:
-        db_table = 'auth_refresh_token'
-        indexes = [
-            models.Index(fields=['user', 'is_blacklisted']),
-            models.Index(fields=['expires_at']),
-        ]
-
-    def __str__(self):
-        return f"RefreshToken for {self.user.email}"
-
-    @property
-    def is_expired(self):
-        return timezone.now() > self.expires_at
