@@ -7,13 +7,19 @@ from authentication.views import (
     login_view,
     forgot_password,
     reset_password,
-    send_email_otp,
+    # send_otp_util,
     verify_email_otp,
+    resend_email_otp,
+    VerifyIdentityView,
+    DocumentTypesView, UploadPictureView, LocationPermissionView,
 )
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
+from django.conf import settings
+from django.conf.urls.static import static
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -36,8 +42,18 @@ urlpatterns = [
     path("login/", login_view),
     path("forgot-password/", forgot_password),
     path("users/<uuid:user_id>/reset-password/", reset_password),
-    path("email/send-otp/", send_email_otp),
+    path("email/send-otp/", resend_email_otp),
     path("email/verify-otp/", verify_email_otp),
 
+    path("verify_identity/", VerifyIdentityView.as_view(), name="verify_identity" ),
+    path("document-type/", DocumentTypesView.as_view(), name="document-types" ),
+    path("upload-picture/", UploadPictureView.as_view(), name="upload-picture"),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path("location-permission/", LocationPermissionView.as_view(), name="location-permission"),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
+
+
 ]
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

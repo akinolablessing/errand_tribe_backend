@@ -37,9 +37,18 @@ class User(AbstractUser):
         null=True,
         blank=True,
     )
+    profile_picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
     email_otp = models.CharField(max_length=6, null=True, blank=True)
     email_otp_created_at = models.DateTimeField(null=True, blank=True)
-    is_email_verified = models.BooleanField(default=False)  # 🔑 required for login
+    is_email_verified = models.BooleanField(default=False)
+
+    LOCATION_CHOICES = [
+        ("while_using_app", "While Using App"),
+        ("always", "Always"),
+    ]
+    location_permission = models.CharField(
+        max_length=20, choices=LOCATION_CHOICES, default="while_using_app"
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name", "phone_number"]
@@ -60,3 +69,26 @@ class User(AbstractUser):
             self.save()
             return True
         return False
+
+class CountryChoices(models.TextChoices):
+    NIGERIA = "Nigeria", "Nigeria"
+    KENYA = "Kenya", "Kenya"
+    TOGO = "Togo", "Togo"
+    GHANA = "Ghana", "Ghana"
+
+class DocumentTypeChoices(models.TextChoices):
+    NATIONAL_ID = "National ID", "National ID"
+    DRIVERS_LICENSE = "Driver's License", "Driver's License"
+    PASSPORT = "Passport", "Passport"
+    REFUGEE_ID = "Alien Card/Carte Nationale d'Identite", "Alien Card/Carte Nationale d'Identite"
+
+class IdentityVerification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    country = models.CharField(max_length=50, choices=CountryChoices.choices)
+    document_type = models.CharField(max_length=50, choices=DocumentTypeChoices.choices)
+    document_file = models.FileField(upload_to='identity_documents/')
+    verified = models.BooleanField(default=False)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.document_type} ({self.country})"
