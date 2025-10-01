@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
+from .models import IdentityVerification
+
 
 User = get_user_model()
 
@@ -40,3 +42,18 @@ class LoginSerializer(serializers.Serializer):
 class EmailOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(required=False, max_length=6)
+
+class IdentityVerificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IdentityVerification
+        fields = ['country', 'document_type', 'document_file']
+
+class UploadPictureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["profile_picture"]
+
+class LocationPermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["location_permission"]
