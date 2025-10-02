@@ -1,1 +1,1 @@
-web: gunicorn your_project_name.wsgi:application --log-file -
+web: gunicorn errand_tribe_backend-2.wsgi:application --log-file -
