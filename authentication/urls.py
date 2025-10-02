@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path, include
 
+from authentication import views
 from authentication.views import (
     get_started,
     signup,
@@ -41,26 +42,8 @@ schema_view = get_schema_view(
 def health_check(request):
     return JsonResponse({"status": "API is running 🚀"})
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("get-started/", get_started),
-    path("signup/", signup),
-    path("users/<uuid:user_id>/create-password/", create_password),
-    path("login/", login_view),
-    path("forgot-password/", forgot_password),
-    path("users/<uuid:user_id>/reset-password/", reset_password),
-    path("email/send-otp/", resend_email_otp),
-    path("email/verify-otp/", verify_email_otp),
-
-    path("verify_identity/", VerifyIdentityView.as_view(), name="verify_identity" ),
-    path("document-type/", DocumentTypesView.as_view(), name="document-types" ),
-    path("upload-picture/", UploadPictureView.as_view(), name="upload-picture"),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path("location-permission/", LocationPermissionView.as_view(), name="location-permission"),
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
-
-    path("", health_check),  # root route
-    path("auth/", include("authentication.urls")),
+    path("signup/", views.signup, name="signup"),
+    path("login/", views.login_view, name="login"),
 
 
 ]
