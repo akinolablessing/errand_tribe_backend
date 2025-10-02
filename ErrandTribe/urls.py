@@ -3,7 +3,7 @@ from django.contrib import admin
 
 
 from django.http import JsonResponse
-from django.urls import path, include
+from django.urls import path, include, re_path
 
 from authentication.views import (
     get_started,
@@ -36,7 +36,7 @@ schema_view = get_schema_view(
        license=openapi.License(name="BSD License"),
    ),
     public=True,
-    permission_classes=(permissions.AllowAny,),
+    permission_classes=[permissions.AllowAny],
 )
 def health_check(request):
     return JsonResponse({"status": "API is running 🚀"})
@@ -56,6 +56,9 @@ urlpatterns = [
     path("upload-picture/", UploadPictureView.as_view(), name="upload-picture"),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("location-permission/", LocationPermissionView.as_view(), name="location-permission"),
+
+    re_path(r'^swagger(?P<format>\.json|\.yaml)$',
+                schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
 
