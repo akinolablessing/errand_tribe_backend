@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 dotenv = "*"
+sib-api-v3-sdk = "*"
 
 [dev-packages]
 

@@ -4,7 +4,10 @@ import logging
 import random
 from django.core.mail import send_mail
 from django.conf import settings
-
+import os
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -19,24 +22,35 @@ otp_storage = {}
 
 
 def send_email_otp(user):
-    otp = generate_otp()
-    user.set_email_otp(otp)
-    subject = 'Verify Your Email - Errand App'
-    message = f"""
-        Hi {user.first_name},
-
-        Your email verification code is: {otp}
-
-        This code will expire in 10 minutes.
-
-        If you didn't request this verification, please ignore this email.
-
-        Best regards,
-        The Errand App Team
+    """
+        Generate OTP and send it to the user's email using Brevo.
         """
-    send_mail(subject, message, settings.EMAIL_HOST_USER, [user.email])
+    # Generate a 6-digit OTP
+    otp = str(random.randint(100000, 999999))
 
-    return otp
+    # Configure Brevo
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
+
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+
+    # Prepare email
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=[{"email": user.email, "name": user.first_name}],
+        sender={"email": "ettribe.errands@gmail.com", "name": "Errand Tribe"},
+        subject="Your OTP Code",
+        html_content=f"""
+                <p>Hi {user.first_name},</p>
+                <p>Your OTP code is: <b>{otp}</b></p>
+                <p>It will expire in 30 minutes.</p>
+            """,
+    )
+
+    try:
+        api_instance.send_transac_email(send_smtp_email)
+        return otp
+    except ApiException as e:
+        raise Exception(f"Failed to send OTP: {e}")
 
 def send_sms_otp(user):
     otp = generate_otp()

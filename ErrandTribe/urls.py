@@ -55,6 +55,7 @@ urlpatterns = [
     path("users/<uuid:user_id>/password/reset/", reset_password, name="user-password-reset"),
 
     path("auth/email/otp/send/", resend_email_otp, name="auth-email-otp-send"),
+
     path("auth/email/otp/verify/", verify_email_otp, name="auth-email-otp-verify"),
 
     path("identity/verify/", VerifyIdentityView.as_view(), name="identity-verify"),

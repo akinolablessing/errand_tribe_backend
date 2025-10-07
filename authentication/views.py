@@ -50,8 +50,9 @@ def signup(request):
 
             return Response(
                 {
-                    "message": f"Hi {user.first_name},\n\nYour OTP code is: {otp}\nIt will expire in 30 minutes.",
+                    "message": f"We've sent an OTP with an activation code to your email:  {user.email}",
                     "user_id": str(user.id),
+                    "otp_sent": True
                 },
                 status=201,
             )
@@ -174,6 +175,7 @@ def resend_email_otp(request):
         email = serializer.validated_data["email"]
         try:
             user = User.objects.get(email=email)
+            print(user)
             otp = send_otp_util(user)
             return Response({
                 "message": f"OTP resent successfully to {email}",
