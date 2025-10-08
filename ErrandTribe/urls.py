@@ -14,7 +14,10 @@ from authentication.views import (
     VerifyIdentityView,
     DocumentTypesView,
     UploadPictureView,
-    LocationPermissionView, WithdrawalMethodListCreateView, WithdrawalMethodDetailView,
+    LocationPermissionView,
+    WithdrawalMethodListCreateView,
+    WithdrawalMethodDetailView,
+    FundWalletView,
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework import permissions
@@ -64,9 +67,10 @@ urlpatterns = [
     path("location/permission/", LocationPermissionView.as_view(), name="location-permission"),
 
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
-    path("withdrawal-methods/", WithdrawalMethodListCreateView.as_view(), name="withdrawal-method-list-create"),
+    path("withdrawal-methods/", WithdrawalMethodListCreateView.as_view(), name="withdrawal-method"),
     path("withdrawal-methods/<int:pk>/", WithdrawalMethodDetailView.as_view(), name="withdrawal-method-detail"),
 
+    path("fund-wallet/", FundWalletView.as_view(), name="fund-wallet"),
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
 

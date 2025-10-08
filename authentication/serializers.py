@@ -42,9 +42,7 @@ class EmailOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(required=False, max_length=6)
 
-# class EmailOTPSerializer(serializers.Serializer):
-#     email = serializers.EmailField()
-#     otp = serializers.CharField(max_length=6)
+
 
 class IdentityVerificationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,8 +59,9 @@ class LocationPermissionSerializer(serializers.ModelSerializer):
         model = User
         fields = ["location_permission"]
 
+
+
 class WithdrawalMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = WithdrawalMethod
-        fields = ["id", "bank_name", "account_number", "account_name", "created_at"]
-        read_only_fields = ["id", "created_at"]
+        fields = ["id", "method_type", "bank_name", "account_number", "account_name", "created_at"]

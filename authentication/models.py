@@ -1,5 +1,4 @@
 import uuid
-from datetime import timedelta
 
 from django.contrib.auth.models import BaseUserManager, AbstractUser
 from django.db import models
@@ -47,6 +46,8 @@ class User(AbstractUser):
     email_otp_created_at = models.DateTimeField(null=True, blank=True)
     is_email_verified = models.BooleanField(default=False)
 
+    wallet_balance = models.DecimalField(default=0.00, max_digits=12, decimal_places=2)
+
     LOCATION_CHOICES = [
         ("while_using_app", "While Using App"),
         ("always", "Always"),
@@ -64,16 +65,6 @@ class User(AbstractUser):
         self.email_otp_created_at = timezone.now()
         self.save(update_fields=["email_otp", "email_otp_created_at"])
 
-    # def verify_email_otp(self, otp: str) -> bool:
-    #     if not self.email_otp or self.email_otp != str(otp):
-    #         return False
-    #
-    #     if self.email_otp_created_at < timezone.now() - timedelta(minutes=30):
-    #         return False
-    #     self.is_email_verified = True
-    #     self.email_otp = None
-    #     self.save(update_fields=["is_email_verified", "email_otp"])
-    #     return True
 
 class CountryChoices(models.TextChoices):
     NIGERIA = "Nigeria", "Nigeria"
@@ -98,14 +89,22 @@ class IdentityVerification(models.Model):
     def __str__(self):
         return f"{self.user.email} - {self.document_type} ({self.country})"
 
+
+
 class WithdrawalMethod(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="withdrawal_methods"
+    METHOD_CHOICES = (
+        ("bank", "Bank"),
+        ("paypal", "PayPal"),
+        ("mobile_money", "Mobile Money"),
     )
-    bank_name = models.CharField(max_length=100)
-    account_number = models.CharField(max_length=20)
-    account_name = models.CharField(max_length=100)
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="withdrawal_methods")
+    method_type = models.CharField(max_length=50, choices=METHOD_CHOICES, default="bank")
+    bank_name = models.CharField(max_length=100, blank=True, null=True)
+    account_number = models.CharField(max_length=50, blank=True, null=True)
+    account_name = models.CharField(max_length=100, blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.email} - {self.bank_name} ({self.account_number})"
+        return f"{self.method_type} - {self.account_name}"
