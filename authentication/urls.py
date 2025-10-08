@@ -1,25 +1,10 @@
-from django.urls import path
-from django.contrib import admin
 
 
 from django.http import JsonResponse
 from django.urls import path, include
 
 from authentication import views
-from authentication.views import (
-    get_started,
-    signup,
-    create_password,
-    login_view,
-    forgot_password,
-    reset_password,
-    # send_otp_util,
-    verify_email_otp,
-    resend_email_otp,
-    VerifyIdentityView,
-    DocumentTypesView, UploadPictureView, LocationPermissionView,
-)
-from rest_framework_simplejwt.views import TokenRefreshView
+
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi

@@ -23,6 +23,8 @@ from .serializers import (
     EmailOTPSerializer, IdentityVerificationSerializer, UploadPictureSerializer, LocationPermissionSerializer,
     WithdrawalMethodSerializer,
 )
+from decimal import Decimal
+
 
 User = get_user_model()
 
@@ -189,48 +191,7 @@ def resend_email_otp(request):
     return Response(serializer.errors, status=400)
 
 
-# @swagger_auto_schema(
-#     method="post",
-#     request_body=EmailOTPSerializer,
-#     responses={
-#         200: openapi.Response("Email verified successfully"),
-#         400: "Invalid or expired OTP / Validation error",
-#         404: "User not found",
-#     },
-# )
-# @api_view(["POST"])
-# @permission_classes([AllowAny])
-# def verify_email_otp(request):
-#     """
-#     Verify user's email address using the OTP sent during signup.
-#     """
-#     serializer = EmailOTPSerializer(data=request.data)
-#     if serializer.is_valid():
-#         email = serializer.validated_data["email"]
-#         otp = serializer.validated_data["otp"]
-#
-#         User = get_user_model()
-#         try:
-#             user = User.objects.get(email=email)
-#
-#             if not user.email_otp or user.email_otp != str(otp):
-#                 return Response({"error": "Invalid or expired OTP"}, status=400)
-#
-#             # check expiry (30 mins validity)
-#             if user.email_otp_created_at < timezone.now() - datetime.timedelta(minutes=30):
-#                 return Response({"error": "OTP has expired"}, status=400)
-#
-#             # mark verified
-#             user.is_email_verified = True
-#             user.email_otp = None
-#             user.save(update_fields=["is_email_verified", "email_otp"])
-#
-#             return Response({"message": "Email verified successfully"}, status=200)
-#
-#         except User.DoesNotExist:
-#             return Response({"error": "User not found"}, status=404)
-#
-#     return Response(serializer.errors, status=400)
+
 
 @swagger_auto_schema(
     method="post",
@@ -398,3 +359,61 @@ class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def put(self, request, *args, **kwargs):
         return super().put(request, *args, **kwargs)
+
+
+class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
+    serializer_class = WithdrawalMethodSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return WithdrawalMethod.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+# ✅ Retrieve, Update, Delete a Withdrawal Method
+class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = WithdrawalMethodSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return WithdrawalMethod.objects.filter(user=self.request.user)
+
+
+# ✅ Fund Wallet
+class FundWalletView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Fund the user's wallet using an existing withdrawal method",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "amount": openapi.Schema(type=openapi.TYPE_NUMBER, description="Amount to fund"),
+                "withdrawal_method_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the withdrawal method"),
+            },
+            required=["amount", "withdrawal_method_id"],
+        ),
+        responses={201: "Wallet funded successfully", 400: "Validation error"}
+    )
+    def post(self, request):
+        amount = request.data.get("amount")
+        withdrawal_method_id = request.data.get("withdrawal_method_id")
+
+        if not amount or Decimal(amount) <= 0:
+            return Response({"error": "Invalid amount"}, status=400)
+
+        try:
+            method = WithdrawalMethod.objects.get(id=withdrawal_method_id, user=request.user)
+        except WithdrawalMethod.DoesNotExist:
+            return Response({"error": "Withdrawal method not found"}, status=404)
+
+        request.user.wallet_balance += Decimal(amount)
+        request.user.save(update_fields=["wallet_balance"])
+
+        return Response({
+            "message": "Wallet funded successfully",
+            "new_balance": request.user.wallet_balance,
+            "withdrawal_method": WithdrawalMethodSerializer(method).data
+        }, status=201)
