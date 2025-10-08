@@ -14,7 +14,7 @@ from authentication.views import (
     VerifyIdentityView,
     DocumentTypesView,
     UploadPictureView,
-    LocationPermissionView,
+    LocationPermissionView, WithdrawalMethodListCreateView, WithdrawalMethodDetailView,
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework import permissions
@@ -46,7 +46,6 @@ def health_check(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    # -------- Auth & Users --------
     path("auth/start/", get_started, name="auth-start"),
     path("auth/signup/", signup, name="auth-signup"),
     path("auth/login/", login_view, name="auth-login"),
@@ -54,7 +53,7 @@ urlpatterns = [
     path("auth/password/forgot/", forgot_password, name="auth-password-forgot"),
     path("users/<uuid:user_id>/password/reset/", reset_password, name="user-password-reset"),
 
-    path("auth/email/otp/send/", resend_email_otp, name="auth-email-otp-send"),
+    path("auth/email/otp/send/", resend_email_otp, name="auth-email-otp-resend"),
 
     path("auth/email/otp/verify/", verify_email_otp, name="auth-email-otp-verify"),
 
@@ -65,15 +64,19 @@ urlpatterns = [
     path("location/permission/", LocationPermissionView.as_view(), name="location-permission"),
 
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path("withdrawal-methods/", WithdrawalMethodListCreateView.as_view(), name="withdrawal-method-list-create"),
+    path("withdrawal-methods/<int:pk>/", WithdrawalMethodDetailView.as_view(), name="withdrawal-method-detail"),
 
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
+
     path("docs/swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
     path("docs/redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
 
     path("health/", health_check, name="health-check"),
 
     path("auth/", include("authentication.urls")),
+
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

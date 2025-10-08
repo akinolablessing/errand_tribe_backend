@@ -1,8 +1,10 @@
+import datetime
 import random
+from django.utils import timezone
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import status
+from rest_framework import status, permissions, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -10,15 +12,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
+
+from .models import WithdrawalMethod
 from .utils import send_email_otp as send_otp_util
-from django.utils.decorators import method_decorator
 from ErrandTribe import settings
 from .serializers import (
     SignupSerializer,
     PasswordSerializer,
     LoginSerializer,
     EmailOTPSerializer, IdentityVerificationSerializer, UploadPictureSerializer, LocationPermissionSerializer,
+    WithdrawalMethodSerializer,
 )
 
 User = get_user_model()
@@ -185,27 +188,86 @@ def resend_email_otp(request):
             return Response({"error": "User not found"}, status=404)
     return Response(serializer.errors, status=400)
 
+
+# @swagger_auto_schema(
+#     method="post",
+#     request_body=EmailOTPSerializer,
+#     responses={
+#         200: openapi.Response("Email verified successfully"),
+#         400: "Invalid or expired OTP / Validation error",
+#         404: "User not found",
+#     },
+# )
+# @api_view(["POST"])
+# @permission_classes([AllowAny])
+# def verify_email_otp(request):
+#     """
+#     Verify user's email address using the OTP sent during signup.
+#     """
+#     serializer = EmailOTPSerializer(data=request.data)
+#     if serializer.is_valid():
+#         email = serializer.validated_data["email"]
+#         otp = serializer.validated_data["otp"]
+#
+#         User = get_user_model()
+#         try:
+#             user = User.objects.get(email=email)
+#
+#             if not user.email_otp or user.email_otp != str(otp):
+#                 return Response({"error": "Invalid or expired OTP"}, status=400)
+#
+#             # check expiry (30 mins validity)
+#             if user.email_otp_created_at < timezone.now() - datetime.timedelta(minutes=30):
+#                 return Response({"error": "OTP has expired"}, status=400)
+#
+#             # mark verified
+#             user.is_email_verified = True
+#             user.email_otp = None
+#             user.save(update_fields=["is_email_verified", "email_otp"])
+#
+#             return Response({"message": "Email verified successfully"}, status=200)
+#
+#         except User.DoesNotExist:
+#             return Response({"error": "User not found"}, status=404)
+#
+#     return Response(serializer.errors, status=400)
+
 @swagger_auto_schema(
     method="post",
     request_body=EmailOTPSerializer,
     responses={200: "Email verified successfully", 404: "User not found", 400: "Invalid or expired OTP"},
 )
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def verify_email_otp(request):
     serializer = EmailOTPSerializer(data=request.data)
     if serializer.is_valid():
         email = serializer.validated_data["email"]
+        print(email)
         otp = serializer.validated_data.get("otp")
         try:
             user = User.objects.get(email=email)
-            if user.verify_email_otp(otp):
+            print(user)
+            if verify_otp(user,otp):
                 return Response({"message": "Email verified successfully"})
             return Response({"error": "Invalid or expired OTP"}, status=400)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
     return Response(serializer.errors, status=400)
 
+
+
+def verify_otp(user, otp: str) -> bool:
+    if not user.email_otp or  user.email_otp != str(otp):
+        return False
+
+    if user.email_otp_created_at < timezone.now() - datetime.timedelta(minutes=30):
+        return False
+    user.is_email_verified = True
+    user.email_otp = None
+    user.save(update_fields=["is_email_verified", "email_otp"])
+    return True
 
 DOCUMENT_TYPES_BY_COUNTRY = {
     "Nigeria": ["National ID", "Driver's License", "Passport"],
@@ -290,3 +352,51 @@ class LocationPermissionView(APIView):
         return Response({
             "location_permission": request.user.location_permission
         }, status=status.HTTP_200_OK)
+
+class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
+    serializer_class = WithdrawalMethodSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return WithdrawalMethod.objects.filter(user=self.request.user)
+
+    @swagger_auto_schema(
+        operation_description="List all withdrawal methods for the logged-in user",
+        responses={200: WithdrawalMethodSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_description="Create a new withdrawal method for the logged-in user",
+        request_body=WithdrawalMethodSerializer,
+        responses={201: WithdrawalMethodSerializer()},
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = WithdrawalMethodSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return WithdrawalMethod.objects.filter(user=self.request.user)
+
+    @swagger_auto_schema(
+        operation_description="Retrieve a specific withdrawal method belonging to the logged-in user",
+        responses={200: WithdrawalMethodSerializer()},
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_description="Update a specific withdrawal method belonging to the logged-in user",
+        request_body=WithdrawalMethodSerializer,
+        responses={200: WithdrawalMethodSerializer()},
+    )
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)

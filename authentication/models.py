@@ -1,7 +1,12 @@
 import uuid
+from datetime import timedelta
+
 from django.contrib.auth.models import BaseUserManager, AbstractUser
 from django.db import models
 from django.utils import timezone
+
+from ErrandTribe import settings
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -54,21 +59,21 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["first_name", "last_name", "phone_number"]
     objects = CustomUserManager()
 
-    def set_email_otp(self, otp: str):
+    def set_email_otp(self, otp):
         self.email_otp = otp
         self.email_otp_created_at = timezone.now()
-        self.save()
+        self.save(update_fields=["email_otp", "email_otp_created_at"])
 
-    def verify_email_otp(self, otp: str, expiry_seconds: int = 600) -> bool:
-        if (
-            self.email_otp == otp
-            and (timezone.now() - self.email_otp_created_at).seconds < expiry_seconds
-        ):
-            self.is_email_verified = True
-            self.email_otp = None
-            self.save()
-            return True
-        return False
+    # def verify_email_otp(self, otp: str) -> bool:
+    #     if not self.email_otp or self.email_otp != str(otp):
+    #         return False
+    #
+    #     if self.email_otp_created_at < timezone.now() - timedelta(minutes=30):
+    #         return False
+    #     self.is_email_verified = True
+    #     self.email_otp = None
+    #     self.save(update_fields=["is_email_verified", "email_otp"])
+    #     return True
 
 class CountryChoices(models.TextChoices):
     NIGERIA = "Nigeria", "Nigeria"
@@ -92,3 +97,15 @@ class IdentityVerification(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.document_type} ({self.country})"
+
+class WithdrawalMethod(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="withdrawal_methods"
+    )
+    bank_name = models.CharField(max_length=100)
+    account_number = models.CharField(max_length=20)
+    account_name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.bank_name} ({self.account_number})"
