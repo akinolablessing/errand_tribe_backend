@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.utils import timezone
 from twilio.rest import Client
 import logging
@@ -28,6 +30,7 @@ def send_email_otp(user):
     # Generate a 6-digit OTP
     otp = str(random.randint(100000, 999999))
 
+    user.set_email_otp(otp)
     # Configure Brevo
     configuration = sib_api_v3_sdk.Configuration()
     configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
@@ -51,6 +54,19 @@ def send_email_otp(user):
         return otp
     except ApiException as e:
         raise Exception(f"Failed to send OTP: {e}")
+
+
+# def verify_email_otp(self, otp: str, expiry_seconds: int = 600) -> bool:
+#     if not self.email_otp or self.email_otp != str(otp):
+#         return False
+#
+#     if self.email_otp_created_at < timezone.now() - timedelta(minutes=30):
+#         return False
+#     self.is_email_verified = True
+#     self.email_otp = None
+#     self.save(update_fields=["is_email_verified", "email_otp"])
+#     return True
+
 
 def send_sms_otp(user):
     otp = generate_otp()

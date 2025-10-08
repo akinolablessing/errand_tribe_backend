@@ -110,7 +110,7 @@ DATABASES = {
 }
 
 # Use custom user model
-AUTH_USER_MODEL = 'authentication.User'
+AUTH_USER_MODEL = "authentication.User"
 
 
 # Password validation
