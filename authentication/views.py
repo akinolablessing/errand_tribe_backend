@@ -209,11 +209,11 @@ def verify_email_otp(request):
         try:
             user = User.objects.get(email=email)
             if verify_otp(user,otp):
-                return Response({"message": "Email verified successfully"})
-            return Response({"error": "Invalid or expired OTP"}, status=400)
+                return Response({"success":True,"message": "Email verified successfully"},status=200)
+            return Response({"success":False,"error": "Invalid or expired OTP"}, status=400)
         except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
-    return Response(serializer.errors, status=400)
+            return Response({"success": False,"error": "User not found"}, status=404)
+    return Response({"success": False, "errors": serializer.errors}, status=400)
 
 
 
@@ -372,7 +372,6 @@ class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
         serializer.save(user=self.request.user)
 
 
-# ✅ Retrieve, Update, Delete a Withdrawal Method
 class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WithdrawalMethodSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -381,7 +380,6 @@ class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
         return WithdrawalMethod.objects.filter(user=self.request.user)
 
 
-# ✅ Fund Wallet
 class FundWalletView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
