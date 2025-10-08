@@ -244,11 +244,9 @@ def verify_email_otp(request):
     serializer = EmailOTPSerializer(data=request.data)
     if serializer.is_valid():
         email = serializer.validated_data["email"]
-        print(email)
         otp = serializer.validated_data.get("otp")
         try:
             user = User.objects.get(email=email)
-            print(user)
             if verify_otp(user,otp):
                 return Response({"message": "Email verified successfully"})
             return Response({"error": "Invalid or expired OTP"}, status=400)
