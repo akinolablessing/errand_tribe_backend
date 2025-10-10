@@ -34,7 +34,10 @@ class LoginSerializer(serializers.Serializer):
         user = authenticate(email=data["email"], password=data["password"])
         if not user:
             raise serializers.ValidationError("Invalid credentials")
-        data["user"] = user
+        # data["user"] = user
+        if not user.is_active:
+            raise serializers.ValidationError("This account is inactive")
+        data["is_active"] = user
         return data
 
 
@@ -47,7 +50,8 @@ class EmailOTPSerializer(serializers.Serializer):
 class IdentityVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = IdentityVerification
-        fields = ['country', 'document_type', 'document_file']
+        fields = ['country', 'document_type', 'document_file','verified','submitted_at']
+        read_only_fields = ['verified','submitted_at']
 
 class UploadPictureSerializer(serializers.ModelSerializer):
     class Meta:
@@ -55,13 +59,19 @@ class UploadPictureSerializer(serializers.ModelSerializer):
         fields = ["profile_picture"]
 
 class LocationPermissionSerializer(serializers.ModelSerializer):
+    location_permission = serializers.ChoiceField(choices=User.LOCATION_CHOICES)
+
     class Meta:
         model = User
         fields = ["location_permission"]
 
-
+    def validate_location_permission(self, value):
+        if value not in dict(User.LOCATION_CHOICES):
+            raise serializers.ValidationError("Invalid location permission choice.")
+        return value
 
 class WithdrawalMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = WithdrawalMethod
         fields = ["id", "method_type", "bank_name", "account_number", "account_name", "created_at"]
+        read_only_fields =["id","created_at"]

@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 
+from . import serializers
 from .models import WithdrawalMethod
 from .utils import send_email_otp as send_otp_util
 from ErrandTribe import settings
@@ -111,10 +112,19 @@ def login_view(request):
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data["user"]
-        if not user.is_email_verified:
-            return Response(
-                {"error": "Please verify your email before login."}, status=403
-            )
+
+        steps = [
+            ("is_email_verified", "Verify your email"),
+            ("is_identity_verified", "Verify your identity"),
+            ("has_uploaded_picture", "Upload your profile picture"),
+            ("has_enabled_location", "Enable location"),
+            ("has_withdrawal_method", "Add a withdrawal method"),
+            ("has_funded_wallet", "Fund your wallet"),
+        ]
+
+        for field, message in steps:
+            if not getattr(user, field):
+                return Response({"error": message}, status=403)
         tokens = generate_tokens_for_user(user)
         return Response({"message": "Login successful", "tokens": tokens})
     return Response(serializer.errors, status=400)
@@ -254,76 +264,128 @@ class DocumentTypesView(APIView):
         return Response({"error": "Unsupported country."}, status=400)
 
 class VerifyIdentityView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
     @swagger_auto_schema(
         request_body=IdentityVerificationSerializer,
         operation_description="Upload identity document for verification",
-        responses={201: "Verification submitted", 400: "Validation error"}
+        manual_parameters=[
+            openapi.Parameter(
+                "user_id",
+                openapi.IN_PATH,
+                description="UUID of the user submitting identity verification",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            201: openapi.Response("Verification submitted"),
+            400: openapi.Response("Validation error"),
+            404: openapi.Response("User not found"),
+        }
     )
-    def post(self, request):
+    def post(self, request,user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
         serializer = IdentityVerificationSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(user=request.user)
+            serializer.save(user=user)
+            user.is_identity_verified = True
+            user.save(update_fields=["is_identity_verified"])
             return Response({"message": "Verification submitted"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UploadPictureView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
     @swagger_auto_schema(
         request_body=UploadPictureSerializer,
         operation_description="Upload or update user profile picture",
-        responses={200: "Profile picture uploaded", 400: "Validation error"}
+        responses={200: "Profile picture uploaded successfully", 400: "Validation error", 404:"User not found"},
     )
-    def post(self, request):
-        serializer = UploadPictureSerializer(instance=request.user, data=request.data, partial=True)
+    def post(self, request,user_id):
+        profile_picture_url = None
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"success":False,"error": "User not found"}, status=404)
+        serializer = UploadPictureSerializer(instance=user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+
+            if serializer.instance.profile_picture:
+                profile_picture_url = request.build_absolute_uri(serializer.instance.profile_picture.url)
+
+            user.has_uploaded_picture = True
+            user.save(update_fields=["has_uploaded_picture"])
             return Response({
+                "success": True,
                 "message": "Profile picture uploaded successfully",
-                "profile_picture_url": request.user.profile_picture.url if request.user.profile_picture else None
+                "profile_picture_url": profile_picture_url
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LocationPermissionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         request_body=LocationPermissionSerializer,
         operation_description="Enable location with options: 'while_using_app' or 'always'",
-        responses={200: "Location permission updated", 400: "Validation error"}
+        responses={200: "Location permission updated", 400: "Validation error", 404:"User not found"},
     )
-    def post(self, request):
-        serializer = LocationPermissionSerializer(instance=request.user, data=request.data, partial=True)
+    def post(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"success":False,"error": "User not found"}, status=404)
+        serializer = LocationPermissionSerializer(instance=user, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(location_permission=serializer.validated_data["location_permission"])
+            if serializer.validated_data.get("location_permission"):
+                user.has_enabled_location = True
+                user.save(update_fields=["has_enabled_location"])
             return Response({
+                "success": True,
                 "message": "Location permission updated successfully",
-                "location_permission": request.user.location_permission
+                "location_permission": user.location_permission
             }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"success": True,"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    def get(self, request):
+    def get(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({
+                "success": False,
+                "error": "User not found"
+            }, status=status.HTTP_404_NOT_FOUND)
         return Response({
-            "location_permission": request.user.location_permission
+            "success": True,
+            "location_permission": user.location_permission
         }, status=status.HTTP_200_OK)
 
 class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
     serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        return WithdrawalMethod.objects.filter(user=self.request.user)
+        user_id = self.kwargs.get("user_id")
+        return WithdrawalMethod.objects.filter(user_id=user_id)
 
     @swagger_auto_schema(
         operation_description="List all withdrawal methods for the logged-in user",
         responses={200: WithdrawalMethodSerializer(many=True)},
     )
     def get(self, request, *args, **kwargs):
+        user_id = self.kwargs.get("user_id")
+        if not User.objects.filter(id=user_id).exists():
+            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         return super().get(request, *args, **kwargs)
 
     @swagger_auto_schema(
@@ -332,24 +394,33 @@ class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
         responses={201: WithdrawalMethodSerializer()},
     )
     def post(self, request, *args, **kwargs):
+        user_id = self.kwargs.get("user_id")
+        try:
+            self.user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         return super().post(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save(user=self.user)
 
 
 class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        return WithdrawalMethod.objects.filter(user=self.request.user)
+        user_id = self.kwargs.get("user_id")
+        return WithdrawalMethod.objects.filter(user_id=user_id)
 
     @swagger_auto_schema(
         operation_description="Retrieve a specific withdrawal method belonging to the logged-in user",
         responses={200: WithdrawalMethodSerializer()},
     )
     def get(self, request, *args, **kwargs):
+        user_id = self.kwargs.get("user_id")
+        if not User.objects.filter(id=user_id).exists():
+            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         return super().get(request, *args, **kwargs)
 
     @swagger_auto_schema(
@@ -358,30 +429,44 @@ class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
         responses={200: WithdrawalMethodSerializer()},
     )
     def put(self, request, *args, **kwargs):
+        user_id = self.kwargs.get("user_id")
+        if not User.objects.filter(id=user_id).exists():
+            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         return super().put(request, *args, **kwargs)
 
 
 class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
     serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        return WithdrawalMethod.objects.filter(user=self.request.user)
+        user_id = self.kwargs.get("user_id")
+        return WithdrawalMethod.objects.filter(user_id=user_id)
+
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user_id = self.kwargs.get("user_id")
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"})
+        serializer.save(user=user)
+        if not user.has_withdrawal_method:
+            user.has_withdrawal_method = True
+            user.save(update_fields=["has_withdrawal_method"])
 
 
 class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        return WithdrawalMethod.objects.filter(user=self.request.user)
+        user_id = self.kwargs.get("user_id")
+        return WithdrawalMethod.objects.filter(user_id=user_id)
 
 
 class FundWalletView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     @swagger_auto_schema(
         operation_description="Fund the user's wallet using an existing withdrawal method",
@@ -393,9 +478,13 @@ class FundWalletView(APIView):
             },
             required=["amount", "withdrawal_method_id"],
         ),
-        responses={201: "Wallet funded successfully", 400: "Validation error"}
+        responses={201: "Wallet funded successfully", 400: "Validation error",404: "User or withdrawal method not found"}
     )
-    def post(self, request):
+    def post(self, request,user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         amount = request.data.get("amount")
         withdrawal_method_id = request.data.get("withdrawal_method_id")
 
@@ -403,15 +492,17 @@ class FundWalletView(APIView):
             return Response({"error": "Invalid amount"}, status=400)
 
         try:
-            method = WithdrawalMethod.objects.get(id=withdrawal_method_id, user=request.user)
+            method = WithdrawalMethod.objects.get(id=withdrawal_method_id, user=user)
         except WithdrawalMethod.DoesNotExist:
             return Response({"error": "Withdrawal method not found"}, status=404)
 
-        request.user.wallet_balance += Decimal(amount)
-        request.user.save(update_fields=["wallet_balance"])
+        user.wallet_balance += Decimal(amount)
+        if not user.has_funded_wallet:
+            user.has_funded_wallet = True
+        user.save(update_fields=["wallet_balance", "has_funded_wallet"])
 
         return Response({
             "message": "Wallet funded successfully",
-            "new_balance": request.user.wallet_balance,
+            "new_balance": user.wallet_balance,
             "withdrawal_method": WithdrawalMethodSerializer(method).data
         }, status=201)
