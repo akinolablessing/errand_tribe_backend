@@ -49,18 +49,18 @@ def health_check(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    path("auth/start/", get_started, name="auth-start"),
-    path("auth/signup/", signup, name="auth-signup"),
-    path("auth/login/", login_view, name="auth-login"),
-    path("users/<uuid:user_id>/password/set/", create_password, name="user-password-set"),
-    path("auth/password/forgot/", forgot_password, name="auth-password-forgot"),
-    path("users/<uuid:user_id>/password/reset/", reset_password, name="user-password-reset"),
+    path("auth/get-started/", get_started, name="get-started"),
+    path("auth/signup/", signup, name="signup"),
+    path("auth/login/", login_view, name="login"),
+    path("users/<uuid:user_id>/set-password/", create_password, name="set-password"),
+    path("auth/forgot-password/", forgot_password, name="forgot-password"),
+    path("users/<uuid:user_id>/reset-password/", reset_password, name="reset-password"),
 
-    path("auth/email/otp/send/", resend_email_otp, name="auth-email-otp-resend"),
+    path("auth/email/send-otp/", resend_email_otp, name="request-new-otp"),
 
-    path("auth/email/otp/verify/", verify_email_otp, name="auth-email-otp-verify"),
+    path("auth/email/verify/", verify_email_otp, name="verify-otp"),
 
-    path("identity/verify/<uuid:user_id>/", VerifyIdentityView.as_view(), name="verify-identity"),
+    path("verify-identity/<uuid:user_id>/", VerifyIdentityView.as_view(), name="identity-verification"),
     path("documents/types/", DocumentTypesView.as_view(), name="document-types"),
     path("users/<uuid:user_id>/upload-picture/", UploadPictureView.as_view(), name="upload-picture"),
 

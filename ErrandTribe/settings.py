@@ -98,16 +98,7 @@ DATABASES = {
 }
 
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': "django.db.backends.postgresql",
-#         'NAME': 'errand_tribe',
-#         'USER': 'ayomide',
-#         'PASSWORD': 'Ayodeji@321',
-#         'HOST': 'localhost',
-#         'PORT': '5432'
-#     }
-# }
+
 
 # Use custom user model
 AUTH_USER_MODEL = "authentication.User"
