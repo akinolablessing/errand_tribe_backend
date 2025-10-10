@@ -60,17 +60,20 @@ urlpatterns = [
 
     path("auth/email/otp/verify/", verify_email_otp, name="auth-email-otp-verify"),
 
-    path("identity/verify/", VerifyIdentityView.as_view(), name="identity-verify"),
+    path("identity/verify/<uuid:user_id>/", VerifyIdentityView.as_view(), name="verify-identity"),
     path("documents/types/", DocumentTypesView.as_view(), name="document-types"),
-    path("documents/upload/", UploadPictureView.as_view(), name="document-upload"),
+    path("users/<uuid:user_id>/upload-picture/", UploadPictureView.as_view(), name="upload-picture"),
 
-    path("location/permission/", LocationPermissionView.as_view(), name="location-permission"),
+    path('users/<uuid:user_id>/location-permission/', LocationPermissionView.as_view(), name='location-permission'),
 
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
-    path("withdrawal-methods/", WithdrawalMethodListCreateView.as_view(), name="withdrawal-method"),
-    path("withdrawal-methods/<int:pk>/", WithdrawalMethodDetailView.as_view(), name="withdrawal-method-detail"),
+    path("users/<uuid:user_id>/withdrawal-methods/", WithdrawalMethodListCreateView.as_view(),
+         name="withdrawal-methods"),
+    path("users/<uuid:user_id>/withdrawal-methods/<uuid:pk>/", WithdrawalMethodDetailView.as_view(),
+         name="withdrawal-method-detail"),
 
-    path("fund-wallet/", FundWalletView.as_view(), name="fund-wallet"),
+    path("users/<uuid:user_id>/fund-wallet/", FundWalletView.as_view(), name="fund-wallet"),
+
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
 

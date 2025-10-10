@@ -41,11 +41,15 @@ class User(AbstractUser):
         null=True,
         blank=True,
     )
-    profile_picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
-    email_otp = models.CharField(max_length=6, null=True, blank=True)
-    email_otp_created_at = models.DateTimeField(null=True, blank=True)
-    is_email_verified = models.BooleanField(default=False)
 
+    is_email_verified = models.BooleanField(default=False)
+    is_identity_verified = models.BooleanField(default=False)
+    has_uploaded_picture = models.BooleanField(default=False)
+    has_enabled_location = models.BooleanField(default=False)
+    has_withdrawal_method = models.BooleanField(default=False)
+    has_funded_wallet = models.BooleanField(default=False)
+
+    profile_picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
     wallet_balance = models.DecimalField(default=0.00, max_digits=12, decimal_places=2)
 
     LOCATION_CHOICES = [
@@ -55,6 +59,9 @@ class User(AbstractUser):
     location_permission = models.CharField(
         max_length=20, choices=LOCATION_CHOICES, default="while_using_app"
     )
+
+    email_otp = models.CharField(max_length=6, null=True, blank=True)
+    email_otp_created_at = models.DateTimeField(null=True, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name", "phone_number"]
@@ -79,7 +86,9 @@ class DocumentTypeChoices(models.TextChoices):
     REFUGEE_ID = "Alien Card/Carte Nationale d'Identite", "Alien Card/Carte Nationale d'Identite"
 
 class IdentityVerification(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="identity_verification")
     country = models.CharField(max_length=50, choices=CountryChoices.choices)
     document_type = models.CharField(max_length=50, choices=DocumentTypeChoices.choices)
     document_file = models.FileField(upload_to='identity_documents/')
@@ -92,6 +101,8 @@ class IdentityVerification(models.Model):
 
 
 class WithdrawalMethod(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     METHOD_CHOICES = (
         ("bank", "Bank"),
         ("paypal", "PayPal"),
