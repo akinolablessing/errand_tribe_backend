@@ -26,6 +26,9 @@ from .serializers import (
 )
 from decimal import Decimal
 
+import os
+import requests
+from django.shortcuts import get_object_or_404
 
 User = get_user_model()
 
@@ -506,3 +509,132 @@ class FundWalletView(APIView):
             "new_balance": user.wallet_balance,
             "withdrawal_method": WithdrawalMethodSerializer(method).data
         }, status=201)
+
+
+@swagger_auto_schema(
+    method="post",
+    operation_description="Initialize a payment using Flutterwave API",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "amount": openapi.Schema(type=openapi.TYPE_NUMBER, description="Amount to charge"),
+            "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency, e.g., NGN"),
+            "email": openapi.Schema(type=openapi.TYPE_STRING, description="Customer email"),
+            "tx_ref": openapi.Schema(type=openapi.TYPE_STRING, description="Unique transaction reference"),
+            "redirect_url": openapi.Schema(type=openapi.TYPE_STRING, description="Optional redirect URL after payment")
+        },
+        required=["amount", "currency", "email", "tx_ref"]
+    ),
+    responses={
+        200: openapi.Response(description="Payment link created successfully"),
+        400: openapi.Response(description="Validation error")
+    }
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def create_flutterwave_payment(request):
+
+    FLW_SECRET_KEY = os.environ.get("FLW_SECRET_KEY")
+    url = "https://api.flutterwave.com/v3/payments"
+
+    amount = request.data.get("amount")
+    currency = request.data.get("currency", "NGN")
+    email = request.data.get("email")
+    tx_ref = request.data.get("tx_ref")
+    redirect_url = request.data.get("redirect_url", "https://example.com/payment-success")
+
+    if not all([amount, currency, email, tx_ref]):
+        return Response({"detail": "Missing required fields"}, status=400)
+
+    payload = {
+        "tx_ref": tx_ref,
+        "amount": amount,
+        "currency": currency,
+        "redirect_url": redirect_url,
+        "customer": {"email": email},
+        "customizations": {
+            "title": "ErrandTribe Wallet Funding",
+            "description": "Fund your wallet using Flutterwave"
+        }
+    }
+
+    headers = {
+        "Authorization": f"Bearer {FLW_SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return Response({
+            "message": "Payment link created successfully",
+            "payment_link": data.get("data", {}).get("link")
+        }, status=200)
+    except requests.RequestException as e:
+        return Response({"detail": "Failed to create payment", "error": str(e)}, status=502)
+
+
+@swagger_auto_schema(
+    method="post",
+    operation_description="Verify Flutterwave payment and credit the user's wallet",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "transaction_id": openapi.Schema(type=openapi.TYPE_STRING, description="Flutterwave transaction ID"),
+            "user_id": openapi.Schema(type=openapi.TYPE_STRING, description="UUID of user to credit"),
+            "expected_amount": openapi.Schema(type=openapi.TYPE_NUMBER, description="Expected payment amount"),
+        },
+        required=["transaction_id", "user_id", "expected_amount"]
+    ),
+    responses={
+        200: openapi.Response(description="Wallet credited successfully"),
+        400: openapi.Response(description="Verification failed or invalid transaction"),
+        404: openapi.Response(description="User not found")
+    }
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def verify_flutterwave_payment(request):
+    FLW_SECRET_KEY = os.environ.get("FLW_SECRET_KEY")
+    transaction_id = request.data.get("transaction_id")
+    user_id = request.data.get("user_id")
+    expected_amount = request.data.get("expected_amount")
+
+    if not all([transaction_id, user_id, expected_amount]):
+        return Response({"detail": "Missing required fields"}, status=400)
+
+    url = f"https://api.flutterwave.com/v3/transactions/{transaction_id}/verify"
+    headers = {"Authorization": f"Bearer {FLW_SECRET_KEY}"}
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as e:
+        return Response({"detail": "Failed to contact payment provider", "error": str(e)}, status=502)
+
+    if data.get("status") != "success":
+        return Response({"detail": "Verification failed", "raw": data}, status=400)
+
+    tx_data = data.get("data", {})
+    if tx_data.get("status") != "successful":
+        return Response({"detail": "Transaction not successful"}, status=400)
+
+    charged_amount = Decimal(str(tx_data.get("amount")))
+    expected_amount = Decimal(str(expected_amount))
+
+    if charged_amount < expected_amount:
+        return Response({"detail": "Charged amount less than expected"}, status=400)
+
+    user = get_object_or_404(User, id=user_id)
+    user.wallet_balance = (user.wallet_balance or Decimal("0.00")) + charged_amount
+    user.has_funded_wallet = True
+    user.save(update_fields=["wallet_balance", "has_funded_wallet"])
+
+    return Response({
+        "message": "Wallet funded successfully",
+        "credited_amount": str(charged_amount),
+        "new_balance": str(user.wallet_balance),
+        "transaction_ref": tx_data.get("tx_ref")
+    }, status=200)

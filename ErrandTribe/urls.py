@@ -18,6 +18,9 @@ from authentication.views import (
     WithdrawalMethodListCreateView,
     WithdrawalMethodDetailView,
     FundWalletView,
+    create_flutterwave_payment,
+    verify_flutterwave_payment,
+
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework import permissions
@@ -74,6 +77,8 @@ urlpatterns = [
 
     path("users/<uuid:user_id>/fund-wallet/", FundWalletView.as_view(), name="fund-wallet"),
 
+    path("api/flutterwave/create-payment/", create_flutterwave_payment, name="create-payment"),
+    path("api/flutterwave/verify-payment/", verify_flutterwave_payment, name="verify-payment"),
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
 
