@@ -14,7 +14,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 
 from . import serializers
-from .models import WithdrawalMethod
+from .models import WithdrawalMethod, TermsAndCondition
 from .utils import send_email_otp as send_otp_util
 from ErrandTribe import settings
 from .serializers import (
@@ -126,11 +126,28 @@ def login_view(request):
         ]
 
         for field, message in steps:
-            if not getattr(user, field):
-                return Response({"error": message}, status=403)
+            if not getattr(user, field, False):
+                return Response({"success": False, "error": message}, status=403)
         tokens = generate_tokens_for_user(user)
-        return Response({"message": "Login successful", "tokens": tokens})
-    return Response(serializer.errors, status=400)
+        return Response(
+            {
+                "success": True,
+                "message": "Login successful",
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                },
+                "tokens": tokens,
+            },
+            status=200,
+        )
+    return Response(
+        {
+            "success": False,
+            "errors": serializer.errors,
+        },
+        status=400,
+    )
 
 @swagger_auto_schema(
     method="post",
@@ -638,3 +655,48 @@ def verify_flutterwave_payment(request):
         "new_balance": str(user.wallet_balance),
         "transaction_ref": tx_data.get("tx_ref")
     }, status=200)
+
+
+class TermsAndConditionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Accept the Terms & Conditions after login",
+        responses={200: "Accepted successfully", 400: "Already accepted or invalid request"},
+    )
+    def post(self, request, user_id=None):
+        user = get_object_or_404(User, id=user_id)
+        # user = request.user
+        if hasattr(user, "terms") and user.terms.accepted:
+            return Response({"message": "Terms already accepted."}, status=400)
+
+        terms, _ = TermsAndCondition.objects.update_or_create(
+            user=user,
+            defaults={
+                "accepted": True,
+                "accepted_at": timezone.now(),
+            },
+        )
+        return Response(
+            {
+                "success": True,
+                "message": "Terms accepted successfully.",
+                "accepted_at": terms.accepted_at,
+            },
+            status=200,
+        )
+
+    @swagger_auto_schema(
+        operation_description="Check if user has accepted the Terms & Conditions",
+        responses={200: "Returns user's acceptance status"},
+    )
+    def get(self, request):
+        user = request.user
+        accepted = getattr(user, "terms", None)
+        return Response({
+            "success": True,
+            "user_id": str(user.id),
+            "accepted": accepted.accepted if accepted else False,
+            "accepted_at": accepted.accepted_at if accepted else None,
+        })
+

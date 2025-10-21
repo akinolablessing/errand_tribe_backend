@@ -1,6 +1,8 @@
+from datetime import timezone
+
 from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
-from .models import IdentityVerification, WithdrawalMethod
+from .models import IdentityVerification, WithdrawalMethod, TermsAndCondition
 
 User = get_user_model()
 
@@ -31,13 +33,30 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        user = authenticate(email=data["email"], password=data["password"])
+        # user = authenticate(email=data["email"], password=data["password"])
+        # user = authenticate(username=data["email"], password=data["password"])
+
+
+
+        # if not user:
+        #     raise serializers.ValidationError("Invalid credentials")
+        # # data["user"] = user
+        # if not user.is_active:
+        #     raise serializers.ValidationError("This account is inactive")
+        # data["is_active"] = user
+        # return data
+        email = data.get("email")
+        password = data.get("password")
+
+        # Try to authenticate using email
+        user = authenticate(email=email, password=password)
         if not user:
-            raise serializers.ValidationError("Invalid credentials")
-        # data["user"] = user
+            raise serializers.ValidationError("Invalid email or password.")
         if not user.is_active:
-            raise serializers.ValidationError("This account is inactive")
-        data["is_active"] = user
+            raise serializers.ValidationError("This account is inactive.")
+
+        # ✅ Add the user object to validated_data
+        data["user"] = user
         return data
 
 
@@ -75,3 +94,20 @@ class WithdrawalMethodSerializer(serializers.ModelSerializer):
         model = WithdrawalMethod
         fields = ["id", "method_type", "bank_name", "account_number", "account_name", "created_at"]
         read_only_fields =["id","created_at"]
+
+
+class TermsAndConditionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TermsAndCondition
+        fields = ["user", "accepted", "accepted_at"]
+        read_only_fields = ["accepted_at", "user"]
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data["user"] = user
+        validated_data["accepted"] = True
+        validated_data["accepted_at"] = timezone.now()
+        instance, _ = TermsAndCondition.objects.update_or_create(
+            user=user, defaults=validated_data
+        )
+        return instance

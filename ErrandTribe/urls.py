@@ -19,7 +19,7 @@ from authentication.views import (
     WithdrawalMethodDetailView,
     FundWalletView,
     create_flutterwave_payment,
-    verify_flutterwave_payment,
+    verify_flutterwave_payment, TermsAndConditionView,
 
 )
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -79,6 +79,8 @@ urlpatterns = [
 
     path("api/flutterwave/create-payment/", create_flutterwave_payment, name="create-payment"),
     path("api/flutterwave/verify-payment/", verify_flutterwave_payment, name="verify-payment"),
+
+    path("users/<uuid:user_id>/terms/", TermsAndConditionView.as_view(), name="terms-and-conditions"),
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
 
