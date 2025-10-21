@@ -119,3 +119,11 @@ class WithdrawalMethod(models.Model):
 
     def __str__(self):
         return f"{self.method_type} - {self.account_name}"
+
+class TermsAndCondition(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="terms")
+    accepted = models.BooleanField(default=False)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {'Accepted' if self.accepted else 'Not Accepted'}"
