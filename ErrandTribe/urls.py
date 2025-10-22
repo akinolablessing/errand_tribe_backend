@@ -30,6 +30,7 @@ from drf_yasg import openapi
 from django.conf import settings
 from django.conf.urls.static import static
 
+from dashboard.views import CreateTaskView, SupermarketRunCreateView
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -81,6 +82,10 @@ urlpatterns = [
     path("api/flutterwave/verify-payment/", verify_flutterwave_payment, name="verify-payment"),
 
     path("users/<uuid:user_id>/terms/", TermsAndConditionView.as_view(), name="terms-and-conditions"),
+
+    path("api/tasks/create/local-micro", CreateTaskView.as_view(), name="local-micro-create-task"),
+
+    path('api/supermarket-run/', SupermarketRunCreateView.as_view(), name='supermarket-run-create'),
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
 
