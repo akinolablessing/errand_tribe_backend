@@ -21,6 +21,7 @@ from authentication.views import (
     create_flutterwave_payment,
     verify_flutterwave_payment, TermsAndConditionView,
 
+
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework import permissions
@@ -30,7 +31,7 @@ from drf_yasg import openapi
 from django.conf import settings
 from django.conf.urls.static import static
 
-from dashboard.views import CreateTaskView, SupermarketRunCreateView
+from dashboard.views import CreateTaskView, SupermarketRunCreateView, StartTaskJourneyView
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -82,6 +83,8 @@ urlpatterns = [
     path("api/flutterwave/verify-payment/", verify_flutterwave_payment, name="verify-payment"),
 
     path("users/<uuid:user_id>/terms/", TermsAndConditionView.as_view(), name="terms-and-conditions"),
+
+    path("api/tasks/start-tasks/", StartTaskJourneyView.as_view(), name="start-task-journey"),
 
     path("api/tasks/create/local-micro", CreateTaskView.as_view(), name="local-micro-create-task"),
 
