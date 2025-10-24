@@ -357,25 +357,42 @@ class LocationPermissionView(APIView):
     @swagger_auto_schema(
         request_body=LocationPermissionSerializer,
         operation_description="Enable location with options: 'while_using_app' or 'always'",
-        responses={200: "Location permission updated", 400: "Validation error", 404:"User not found"},
+        responses={200: "Location permission updated", 400: "Validation error", 404: "User not found"},
     )
     def post(self, request, user_id):
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({"success":False,"error": "User not found"}, status=404)
+            return Response({"success": False, "error": "User not found"}, status=404)
+
         serializer = LocationPermissionSerializer(instance=user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save(location_permission=serializer.validated_data["location_permission"])
+
             if serializer.validated_data.get("location_permission"):
                 user.has_enabled_location = True
                 user.save(update_fields=["has_enabled_location"])
-            return Response({
-                "success": True,
-                "message": "Location permission updated successfully",
-                "location_permission": user.location_permission
-            }, status=status.HTTP_200_OK)
-        return Response({"success": True,"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+                tokens = generate_tokens_for_user(user)
+
+                return Response({
+                    "success": True,
+                    "message": "Location permission updated successfully",
+                    "location_permission": user.location_permission,
+                    "tokens": tokens,
+                    "user": {
+                        "id": str(user.id),
+                        "email": user.email,
+                        "is_email_verified": user.is_email_verified,
+                        "is_identity_verified": user.is_identity_verified,
+                        "has_uploaded_picture": user.has_uploaded_picture,
+                        "has_enabled_location": user.has_enabled_location,
+                        "has_withdrawal_method": user.has_withdrawal_method,
+                        "has_funded_wallet": user.has_funded_wallet,
+                    }
+                }, status=status.HTTP_200_OK)
+
+        return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request, user_id):
         try:
@@ -389,6 +406,7 @@ class LocationPermissionView(APIView):
             "success": True,
             "location_permission": user.location_permission
         }, status=status.HTTP_200_OK)
+
 
 class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
     serializer_class = WithdrawalMethodSerializer
