@@ -14,15 +14,18 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 
 from . import serializers
-from .models import WithdrawalMethod, TermsAndCondition
+from .models import TermsAndCondition
 from .utils import send_email_otp as send_otp_util
 from ErrandTribe import settings
 from .serializers import (
     SignupSerializer,
     PasswordSerializer,
     LoginSerializer,
-    EmailOTPSerializer, IdentityVerificationSerializer, UploadPictureSerializer, LocationPermissionSerializer,
-    WithdrawalMethodSerializer,
+    EmailOTPSerializer,
+    IdentityVerificationSerializer,
+    UploadPictureSerializer,
+    LocationPermissionSerializer,
+    # WithdrawalMethodSerializer,
 )
 from decimal import Decimal
 
@@ -99,7 +102,14 @@ def create_password(request, user_id):
             user = User.objects.get(id=user_id)
             user.set_password(serializer.validated_data["password"])
             user.save()
-            return Response({"message": "Password created successfully"})
+            tokens = generate_tokens_for_user(user)
+            return Response({
+                "message": "Password created successfully",
+                "tokens": tokens,
+                "user": {
+                    "id": str(user.id),
+                }
+            })
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
     return Response(serializer.errors, status=400)
@@ -121,8 +131,8 @@ def login_view(request):
             ("is_identity_verified", "Verify your identity"),
             ("has_uploaded_picture", "Upload your profile picture"),
             ("has_enabled_location", "Enable location"),
-            ("has_withdrawal_method", "Add a withdrawal method"),
-            ("has_funded_wallet", "Fund your wallet"),
+            # ("has_withdrawal_method", "Add a withdrawal method"),
+            # ("has_funded_wallet", "Fund your wallet"),
         ]
 
         for field, message in steps:
@@ -373,13 +383,10 @@ class LocationPermissionView(APIView):
                 user.has_enabled_location = True
                 user.save(update_fields=["has_enabled_location"])
 
-                tokens = generate_tokens_for_user(user)
-
                 return Response({
                     "success": True,
                     "message": "Location permission updated successfully",
                     "location_permission": user.location_permission,
-                    "tokens": tokens,
                     "user": {
                         "id": str(user.id),
                         "email": user.email,
@@ -408,143 +415,143 @@ class LocationPermissionView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
-    serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def get_queryset(self):
-        user_id = self.kwargs.get("user_id")
-        return WithdrawalMethod.objects.filter(user_id=user_id)
-
-    @swagger_auto_schema(
-        operation_description="List all withdrawal methods for the logged-in user",
-        responses={200: WithdrawalMethodSerializer(many=True)},
-    )
-    def get(self, request, *args, **kwargs):
-        user_id = self.kwargs.get("user_id")
-        if not User.objects.filter(id=user_id).exists():
-            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        return super().get(request, *args, **kwargs)
-
-    @swagger_auto_schema(
-        operation_description="Create a new withdrawal method for the logged-in user",
-        request_body=WithdrawalMethodSerializer,
-        responses={201: WithdrawalMethodSerializer()},
-    )
-    def post(self, request, *args, **kwargs):
-        user_id = self.kwargs.get("user_id")
-        try:
-            self.user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        return super().post(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.user)
-
-
-class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def get_queryset(self):
-        user_id = self.kwargs.get("user_id")
-        return WithdrawalMethod.objects.filter(user_id=user_id)
-
-    @swagger_auto_schema(
-        operation_description="Retrieve a specific withdrawal method belonging to the logged-in user",
-        responses={200: WithdrawalMethodSerializer()},
-    )
-    def get(self, request, *args, **kwargs):
-        user_id = self.kwargs.get("user_id")
-        if not User.objects.filter(id=user_id).exists():
-            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        return super().get(request, *args, **kwargs)
-
-    @swagger_auto_schema(
-        operation_description="Update a specific withdrawal method belonging to the logged-in user",
-        request_body=WithdrawalMethodSerializer,
-        responses={200: WithdrawalMethodSerializer()},
-    )
-    def put(self, request, *args, **kwargs):
-        user_id = self.kwargs.get("user_id")
-        if not User.objects.filter(id=user_id).exists():
-            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        return super().put(request, *args, **kwargs)
-
-
-class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
-    serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def get_queryset(self):
-        user_id = self.kwargs.get("user_id")
-        return WithdrawalMethod.objects.filter(user_id=user_id)
+# class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
+#     serializer_class = WithdrawalMethodSerializer
+#     permission_classes = [permissions.AllowAny]
+#
+#     def get_queryset(self):
+#         user_id = self.kwargs.get("user_id")
+#         return WithdrawalMethod.objects.filter(user_id=user_id)
+#
+#     @swagger_auto_schema(
+#         operation_description="List all withdrawal methods for the logged-in user",
+#         responses={200: WithdrawalMethodSerializer(many=True)},
+#     )
+#     def get(self, request, *args, **kwargs):
+#         user_id = self.kwargs.get("user_id")
+#         if not User.objects.filter(id=user_id).exists():
+#             return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+#         return super().get(request, *args, **kwargs)
+#
+#     @swagger_auto_schema(
+#         operation_description="Create a new withdrawal method for the logged-in user",
+#         request_body=WithdrawalMethodSerializer,
+#         responses={201: WithdrawalMethodSerializer()},
+#     )
+#     def post(self, request, *args, **kwargs):
+#         user_id = self.kwargs.get("user_id")
+#         try:
+#             self.user = User.objects.get(id=user_id)
+#         except User.DoesNotExist:
+#             return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+#         return super().post(request, *args, **kwargs)
+#
+#     def perform_create(self, serializer):
+#         serializer.save(user=self.user)
+#
+#
+# class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     serializer_class = WithdrawalMethodSerializer
+#     permission_classes = [permissions.AllowAny]
+#
+#     def get_queryset(self):
+#         user_id = self.kwargs.get("user_id")
+#         return WithdrawalMethod.objects.filter(user_id=user_id)
+#
+#     @swagger_auto_schema(
+#         operation_description="Retrieve a specific withdrawal method belonging to the logged-in user",
+#         responses={200: WithdrawalMethodSerializer()},
+#     )
+#     def get(self, request, *args, **kwargs):
+#         user_id = self.kwargs.get("user_id")
+#         if not User.objects.filter(id=user_id).exists():
+#             return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+#         return super().get(request, *args, **kwargs)
+#
+#     @swagger_auto_schema(
+#         operation_description="Update a specific withdrawal method belonging to the logged-in user",
+#         request_body=WithdrawalMethodSerializer,
+#         responses={200: WithdrawalMethodSerializer()},
+#     )
+#     def put(self, request, *args, **kwargs):
+#         user_id = self.kwargs.get("user_id")
+#         if not User.objects.filter(id=user_id).exists():
+#             return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+#         return super().put(request, *args, **kwargs)
 
 
-    def perform_create(self, serializer):
-        user_id = self.kwargs.get("user_id")
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"error": "User not found"})
-        serializer.save(user=user)
-        if not user.has_withdrawal_method:
-            user.has_withdrawal_method = True
-            user.save(update_fields=["has_withdrawal_method"])
-
-
-class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = WithdrawalMethodSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def get_queryset(self):
-        user_id = self.kwargs.get("user_id")
-        return WithdrawalMethod.objects.filter(user_id=user_id)
-
-
-class FundWalletView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    @swagger_auto_schema(
-        operation_description="Fund the user's wallet using an existing withdrawal method",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                "amount": openapi.Schema(type=openapi.TYPE_NUMBER, description="Amount to fund"),
-                "withdrawal_method_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the withdrawal method"),
-            },
-            required=["amount", "withdrawal_method_id"],
-        ),
-        responses={201: "Wallet funded successfully", 400: "Validation error",404: "User or withdrawal method not found"}
-    )
-    def post(self, request,user_id):
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        amount = request.data.get("amount")
-        withdrawal_method_id = request.data.get("withdrawal_method_id")
-
-        if not amount or Decimal(amount) <= 0:
-            return Response({"error": "Invalid amount"}, status=400)
-
-        try:
-            method = WithdrawalMethod.objects.get(id=withdrawal_method_id, user=user)
-        except WithdrawalMethod.DoesNotExist:
-            return Response({"error": "Withdrawal method not found"}, status=404)
-
-        user.wallet_balance += Decimal(amount)
-        if not user.has_funded_wallet:
-            user.has_funded_wallet = True
-        user.save(update_fields=["wallet_balance", "has_funded_wallet"])
-
-        return Response({
-            "message": "Wallet funded successfully",
-            "new_balance": user.wallet_balance,
-            "withdrawal_method": WithdrawalMethodSerializer(method).data
-        }, status=201)
-
+# class WithdrawalMethodListCreateView(generics.ListCreateAPIView):
+#     serializer_class = WithdrawalMethodSerializer
+#     permission_classes = [permissions.AllowAny]
+#
+#     def get_queryset(self):
+#         user_id = self.kwargs.get("user_id")
+#         return WithdrawalMethod.objects.filter(user_id=user_id)
+#
+#
+#     def perform_create(self, serializer):
+#         user_id = self.kwargs.get("user_id")
+#         try:
+#             user = User.objects.get(id=user_id)
+#         except User.DoesNotExist:
+#             return Response({"error": "User not found"})
+#         serializer.save(user=user)
+#         if not user.has_withdrawal_method:
+#             user.has_withdrawal_method = True
+#             user.save(update_fields=["has_withdrawal_method"])
+#
+#
+# class WithdrawalMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     serializer_class = WithdrawalMethodSerializer
+#     permission_classes = [permissions.AllowAny]
+#
+#     def get_queryset(self):
+#         user_id = self.kwargs.get("user_id")
+#         return WithdrawalMethod.objects.filter(user_id=user_id)
+#
+#
+# class FundWalletView(APIView):
+#     permission_classes = [permissions.AllowAny]
+#
+#     @swagger_auto_schema(
+#         operation_description="Fund the user's wallet using an existing withdrawal method",
+#         request_body=openapi.Schema(
+#             type=openapi.TYPE_OBJECT,
+#             properties={
+#                 "amount": openapi.Schema(type=openapi.TYPE_NUMBER, description="Amount to fund"),
+#                 "withdrawal_method_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the withdrawal method"),
+#             },
+#             required=["amount", "withdrawal_method_id"],
+#         ),
+#         responses={201: "Wallet funded successfully", 400: "Validation error",404: "User or withdrawal method not found"}
+#     )
+#     def post(self, request,user_id):
+#         try:
+#             user = User.objects.get(id=user_id)
+#         except User.DoesNotExist:
+#             return Response({"success": False, "error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+#         amount = request.data.get("amount")
+#         withdrawal_method_id = request.data.get("withdrawal_method_id")
+#
+#         if not amount or Decimal(amount) <= 0:
+#             return Response({"error": "Invalid amount"}, status=400)
+#
+#         try:
+#             method = WithdrawalMethod.objects.get(id=withdrawal_method_id, user=user)
+#         except WithdrawalMethod.DoesNotExist:
+#             return Response({"error": "Withdrawal method not found"}, status=404)
+#
+#         user.wallet_balance += Decimal(amount)
+#         if not user.has_funded_wallet:
+#             user.has_funded_wallet = True
+#         user.save(update_fields=["wallet_balance", "has_funded_wallet"])
+#
+#         return Response({
+#             "message": "Wallet funded successfully",
+#             "new_balance": user.wallet_balance,
+#             "withdrawal_method": WithdrawalMethodSerializer(method).data
+#         }, status=201)
+#
 
 @swagger_auto_schema(
     method="post",
