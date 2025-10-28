@@ -15,9 +15,9 @@ from authentication.views import (
     DocumentTypesView,
     UploadPictureView,
     LocationPermissionView,
-    WithdrawalMethodListCreateView,
-    WithdrawalMethodDetailView,
-    FundWalletView,
+    # WithdrawalMethodListCreateView,
+    # WithdrawalMethodDetailView,
+    # FundWalletView,
     create_flutterwave_payment,
     verify_flutterwave_payment, TermsAndConditionView,
 
@@ -72,12 +72,10 @@ urlpatterns = [
     path('users/<uuid:user_id>/location-permission/', LocationPermissionView.as_view(), name='location-permission'),
 
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
-    path("users/<uuid:user_id>/withdrawal-methods/", WithdrawalMethodListCreateView.as_view(),
-         name="withdrawal-methods"),
-    path("users/<uuid:user_id>/withdrawal-methods/<uuid:pk>/", WithdrawalMethodDetailView.as_view(),
-         name="withdrawal-method-detail"),
+    # path("users/<uuid:user_id>/withdrawal-methods/", WithdrawalMethodListCreateView.as_view(),name="withdrawal-methods"),
+    # path("users/<uuid:user_id>/withdrawal-methods/<uuid:pk>/", WithdrawalMethodDetailView.as_view(),name="withdrawal-method-detail"),
 
-    path("users/<uuid:user_id>/fund-wallet/", FundWalletView.as_view(), name="fund-wallet"),
+    # path("users/<uuid:user_id>/fund-wallet/", FundWalletView.as_view(), name="fund-wallet"),
 
     path("api/flutterwave/create-payment/", create_flutterwave_payment, name="create-payment"),
     path("api/flutterwave/verify-payment/", verify_flutterwave_payment, name="verify-payment"),
