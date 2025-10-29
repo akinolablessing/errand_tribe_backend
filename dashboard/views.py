@@ -7,9 +7,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Task, Escrow, ErrandImage, PickupDelivery
+from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask
 
-from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer
+from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer, \
+    CareTaskSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -264,4 +265,58 @@ class ErrandImageUploadView(APIView):
             {"message": "Image uploaded successfully", "data": serializer.data},
             status=status.HTTP_201_CREATED,
         )
+
+class CareTaskCreateView(generics.CreateAPIView):
+
+    queryset = CareTask.objects.all()
+    serializer_class = CareTaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Create a care task",
+        operation_description=(
+            "Allows an authenticated user to create a new care task. "
+            "The logged-in user will automatically be assigned as the creator of the task."
+        ),
+        request_body=CareTaskSerializer,
+        responses={
+            201: openapi.Response(
+                description="Care task created successfully",
+                examples={
+                    "application/json": {
+                        "success": True,
+                        "message": "Care task created successfully",
+                        "data": {
+                            "id": "a3f1c9a2-7d49-4b1d-bac2-b45b6c17d25f",
+                            "title": "Take care of elderly person",
+                            "description": "Assist with daily routines and medication",
+                            "price": "5000.00",
+                            "status": "open",
+                            "created_at": "2025-10-29T10:30:00Z",
+                            "updated_at": "2025-10-29T10:30:00Z"
+                        }
+                    }
+                },
+            ),
+            400: "Validation Error",
+            401: "Unauthorized",
+        },
+        tags=["Care Tasks"],
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {
+                "success": True,
+                "message": "Care task created successfully",
+                "data": serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
