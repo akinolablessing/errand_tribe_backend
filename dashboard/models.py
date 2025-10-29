@@ -237,3 +237,50 @@ class ErrandImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.errand or 'Unassigned'}"
+
+
+class CareTask(models.Model):
+    RUNNER_ACTIONS = [
+        ('photo', 'Provide photo'),
+        ('video', 'Provide video'),
+        ('text', 'Provide text'),
+        ('other', 'Other'),
+    ]
+
+    FREQUENCY_CHOICES = [
+        ('one_time', 'One Time'),
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="care_tasks")
+
+    title = models.CharField(max_length=255)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    start_time = models.TimeField(null=True, blank=True)
+
+    location = models.CharField(max_length=255, blank=True, null=True)
+
+    care_type = models.CharField(max_length=255, blank=True, null=True)
+    errand_for = models.CharField(max_length=50, choices=[
+        ('me', 'Me'),
+        ('family', 'Family'),
+        ('friend', 'Friend'),
+        ('other', 'Other')
+    ], default='me')
+    instructions = models.TextField(blank=True, null=True)
+    special_request = models.TextField(blank=True, null=True)
+    runner_action = models.CharField(max_length=50, choices=RUNNER_ACTIONS, blank=True, null=True)
+    list_image = models.ImageField(upload_to="caretask_images/", blank=True, null=True)
+
+    frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES, default='one_time')
+    days_of_week = models.JSONField(blank=True, null=True, help_text="Example: ['Mon', 'Wed', 'Fri']")
+
+    min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    max_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title

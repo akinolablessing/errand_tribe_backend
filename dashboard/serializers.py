@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Task, SupermarketRun, PickupDelivery, ErrandImage
+from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -42,3 +42,9 @@ class ErrandImageSerializer(serializers.ModelSerializer):
 
     def get_errand_id(self, obj):
         return str(obj.errand.id) if obj.errand else None
+
+class CareTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CareTask
+        fields = '__all__'
+        read_only_fields = ['user', 'created_at']
