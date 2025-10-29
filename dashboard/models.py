@@ -196,3 +196,44 @@ class SupermarketRun(models.Model):
 
     def __str__(self):
         return self.title
+
+class PickupDelivery(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    is_urgent = models.BooleanField(default=False)
+    deadline = models.DateTimeField(null=True, blank=True)
+
+    pickup_location = models.CharField(max_length=255)
+    pickup_lat = models.FloatField(null=True, blank=True)
+    pickup_lng = models.FloatField(null=True, blank=True)
+    sender_phone = models.CharField(max_length=20)
+
+    dropoff_location = models.CharField(max_length=255)
+    dropoff_lat = models.FloatField(null=True, blank=True)
+    dropoff_lng = models.FloatField(null=True, blank=True)
+    recipient_phone = models.CharField(max_length=20)
+
+    requires_signature = models.BooleanField(default=False)
+    is_fragile = models.BooleanField(default=False)
+    special_note = models.TextField(blank=True, null=True)
+    images = models.JSONField(default=list, blank=True)
+
+    price_min = models.DecimalField(max_digits=10, decimal_places=2)
+    price_max = models.DecimalField(max_digits=10, decimal_places=2)
+
+    status = models.CharField(max_length=20, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+class ErrandImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    errand = models.ForeignKey(
+        "PickupDelivery", on_delete=models.CASCADE, null=True, blank=True, related_name="images_set"
+    )
+    image = models.ImageField(upload_to="uploads/errand_images/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image for {self.errand or 'Unassigned'}"

@@ -7,8 +7,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Task, Escrow
-from .serializers import TaskSerializer, SupermarketRunSerializer
+from .models import Task, Escrow, ErrandImage
+from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -153,4 +153,113 @@ class StartTaskJourneyView(APIView):
                 "tasks": serializer.data,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class PickupDeliveryCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Create a new pickup & delivery errand task.",
+        request_body=PickupDeliverySerializer,
+        responses={
+            201: openapi.Response(
+                description="Pickup & delivery task created successfully",
+                examples={
+                    "application/json": {
+                        "message": "Pickup & delivery task created successfully",
+                        "data": {
+                            "id": "4fbe33f1-b9cb-4c7d-9914-4a2b31e86f8a",
+                            "title": "Pick up package from Shoprite",
+                            "pickup_location": "Shoprite Ikeja Mall, Lagos",
+                            "dropoff_location": "12 Adeola Odeku Street, Victoria Island, Lagos",
+                            "is_fragile": True,
+                            "requires_signature": True,
+                            "price_min": "15000.00",
+                            "price_max": "30000.00",
+                            "status": "pending"
+                        }
+                    }
+                },
+            ),
+            400: "Validation Error",
+            401: "Unauthorized"
+        },
+        tags=["Pickup & Delivery"],
+    )
+    def post(self, request):
+        serializer = PickupDeliverySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(
+                {"message": "Pickup & delivery task created successfully", "data": serializer.data},
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ErrandImageUploadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Upload an image for a PickupDelivery errand (form-data only).",
+        manual_parameters=[
+            openapi.Parameter(
+                name="image",
+                in_=openapi.IN_FORM,
+                description="Image file to upload (JPEG, PNG, WEBP, etc.)",
+                type=openapi.TYPE_FILE,
+                required=True,
+            ),
+            openapi.Parameter(
+                name="errand_id",
+                in_=openapi.IN_FORM,
+                description="Optional: ID of the PickupDelivery to attach the image to",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+        ],
+        responses={
+            201: openapi.Response(
+                description="Image uploaded successfully",
+                examples={
+                    "application/json": {
+                        "message": "Image uploaded successfully",
+                        "data": {
+                            "id": "c2f7451a-928d-4e3b-b7e9-96b239c109f5",
+                            "image_url": "http://localhost:8000/media/uploads/errand_images/sample.jpg",
+                            "errand_id": "8ac5e019-bf11-4b52-a7e2-2a23e83b4e63"
+                        }
+                    }
+                },
+            ),
+            400: "Validation Error",
+            401: "Unauthorized",
+        },
+        tags=["Pickup & Delivery"],
+    )
+    def post(self, request):
+        image_file = request.FILES.get("image")
+        errand_id = request.POST.get("errand_id")
+
+        if not image_file:
+            return Response({"error": "No image provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        errand = None
+        if errand_id:
+            from dashboard.models import PickupDelivery  # adjust import if needed
+            try:
+                errand = PickupDelivery.objects.get(id=errand_id)
+            except PickupDelivery.DoesNotExist:
+                return Response(
+                    {"error": f"PickupDelivery with id {errand_id} not found"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        errand_image = ErrandImage.objects.create(image=image_file, errand=errand)
+        serializer = ErrandImageSerializer(errand_image, context={"request": request})
+
+        return Response(
+            {"message": "Image uploaded successfully", "data": serializer.data},
+            status=status.HTTP_201_CREATED,
         )

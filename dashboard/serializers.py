@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Task, SupermarketRun
+from .models import Task, SupermarketRun, PickupDelivery, ErrandImage
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -17,3 +17,26 @@ class SupermarketRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = SupermarketRun
         fields = '__all__'
+
+class PickupDeliverySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PickupDelivery
+        fields = "__all__"
+        read_only_fields = ["user", "status", "created_at"]
+
+class ErrandImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    errand_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ErrandImage
+        fields = ["id", "errand_id", "image_url"]
+
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        if obj.image and hasattr(obj.image, "url"):
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+    def get_errand_id(self, obj):
+        return str(obj.errand.id) if obj.errand else None
