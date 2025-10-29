@@ -264,3 +264,4 @@ class ErrandImageUploadView(APIView):
             {"message": "Image uploaded successfully", "data": serializer.data},
             status=status.HTTP_201_CREATED,
         )
+
