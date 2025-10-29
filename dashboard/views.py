@@ -248,7 +248,6 @@ class ErrandImageUploadView(APIView):
 
         errand = None
         if errand_id:
-            from dashboard.models import PickupDelivery  # adjust import if needed
             try:
                 errand = PickupDelivery.objects.get(id=errand_id)
             except PickupDelivery.DoesNotExist:
