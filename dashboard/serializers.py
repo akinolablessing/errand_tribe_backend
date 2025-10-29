@@ -35,7 +35,9 @@ class ErrandImageSerializer(serializers.ModelSerializer):
     def get_image_url(self, obj):
         request = self.context.get("request")
         if obj.image and hasattr(obj.image, "url"):
-            return request.build_absolute_uri(obj.image.url)
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
         return None
 
     def get_errand_id(self, obj):
