@@ -138,7 +138,13 @@ def login_view(request):
         for field, message in steps:
             if not getattr(user, field, False):
                 return Response({"success": False, "error": message}, status=403)
+
         tokens = generate_tokens_for_user(user)
+
+        profile_photo_url = None
+        if user.profile_picture:
+            profile_photo_url = request.build_absolute_uri(user.profile_picture.url)
+
         return Response(
             {
                 "success": True,
@@ -146,11 +152,17 @@ def login_view(request):
                 "user": {
                     "id": str(user.id),
                     "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "phone": user.phone,
+                    "role": user.role if hasattr(user, "role") else None,
+                    "profile_photo": profile_photo_url,
                 },
                 "tokens": tokens,
             },
             status=200,
         )
+
     return Response(
         {
             "success": False,
