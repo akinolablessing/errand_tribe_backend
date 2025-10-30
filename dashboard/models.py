@@ -64,7 +64,7 @@ class Transaction(models.Model):
 
 
 class TaskCategory(models.TextChoices):
-    LOCAL_MICRO = "local_micro", "Local Micro Task"
+    LOCAL_MICRO = "local_micro", "Local Errand"
     SUPERMARKET_RUNS = "supermarket_runs", "Supermarket Runs"
     PICKUP_DELIVERY = "pickup_delivery", "Pickup & Delivery"
     CARE_TASKS = "care_tasks", "Care Tasks"
@@ -276,6 +276,48 @@ class CareTask(models.Model):
 
     frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES, default='one_time')
     days_of_week = models.JSONField(blank=True, null=True, help_text="Example: ['Mon', 'Wed', 'Fri']")
+
+    min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    max_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+class VerificationTask(models.Model):
+    VERIFICATION_TYPES = [
+        ('address', 'Address Check'),
+        ('document', 'Document Verification'),
+        ('other', 'Other'),
+    ]
+
+    RUNNER_ACTIONS = [
+        ('photo', 'Provide photo'),
+        ('video', 'Provide video'),
+        ('scan', 'Scan Document'),
+        ('other', 'Other'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="verification_tasks")
+
+    title = models.CharField(max_length=255)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    start_time = models.TimeField(null=True, blank=True)
+
+    verification_type = models.CharField(max_length=50, choices=VERIFICATION_TYPES)
+    other_verification = models.CharField(max_length=255, blank=True, null=True)
+
+    location = models.CharField(max_length=255, blank=True, null=True)
+
+    runner_instructions = models.TextField(blank=True, null=True)
+    runner_action = models.CharField(max_length=50, choices=RUNNER_ACTIONS, blank=True, null=True)
+    runner_action_other = models.CharField(max_length=255, blank=True, null=True)
+    should_speak_on_site = models.BooleanField(default=False)
+    contact_name = models.CharField(max_length=100, blank=True, null=True)
+    contact_phone = models.CharField(max_length=20, blank=True, null=True)
+    save_contact_for_next_time = models.BooleanField(default=False)
 
     min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     max_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)

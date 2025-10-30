@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask
+from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -46,5 +46,12 @@ class ErrandImageSerializer(serializers.ModelSerializer):
 class CareTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = CareTask
+        fields = '__all__'
+        read_only_fields = ['user', 'created_at']
+
+
+class VerificationTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VerificationTask
         fields = '__all__'
         read_only_fields = ['user', 'created_at']
