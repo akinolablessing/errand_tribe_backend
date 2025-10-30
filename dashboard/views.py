@@ -7,10 +7,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask
+from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask
 
 from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer, \
-    CareTaskSerializer
+    CareTaskSerializer, VerificationTaskSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -320,3 +320,33 @@ class CareTaskCreateView(generics.CreateAPIView):
         serializer.save(user=self.request.user)
 
 
+class VerificationTaskCreateView(generics.CreateAPIView):
+
+    queryset = VerificationTask.objects.all()
+    serializer_class = VerificationTaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Create a Verification Task",
+        operation_description=(
+            "Creates a new verification task such as address or document verification.\n\n"
+            "Steps covered:\n"
+            "- Title & Date\n"
+            "- Verification Type\n"
+            "- Location\n"
+            "- Details (instructions, runner actions, contact info)\n"
+            "- Price range"
+        ),
+        request_body=VerificationTaskSerializer,
+        responses={
+            201: openapi.Response('Created', VerificationTaskSerializer),
+            400: 'Bad Request',
+            401: 'Unauthorized'
+        }
+    )
+    def post(self, request, *args, **kwargs):
+
+        return self.create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
