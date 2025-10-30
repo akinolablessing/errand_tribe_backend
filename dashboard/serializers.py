@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask
+from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask, UserProfile
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -55,3 +55,13 @@ class VerificationTaskSerializer(serializers.ModelSerializer):
         model = VerificationTask
         fields = '__all__'
         read_only_fields = ['user', 'created_at']
+
+class UserTierSerializer(serializers.ModelSerializer):
+    errands_left_for_next_tier = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ['tier', 'errands_completed', 'errands_left_for_next_tier']
+
+    def get_errands_left_for_next_tier(self, obj):
+        return max(0, 3 - obj.errands_completed)
