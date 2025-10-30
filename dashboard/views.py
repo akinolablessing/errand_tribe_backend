@@ -7,10 +7,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask
+from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask, UserProfile
 
 from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer, \
-    CareTaskSerializer, VerificationTaskSerializer
+    CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -350,3 +350,25 @@ class VerificationTaskCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+class UserTierView(generics.RetrieveAPIView):
+    serializer_class = UserTierSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Get user tier and progress",
+        operation_description=(
+            "Returns the user's current tier, completed errands count, "
+            "and how many more errands are needed to move to Tier 2."
+        ),
+        responses={200: UserTierSerializer}
+    )
+    def get(self, request, *args, **kwargs):
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile.update_tier()
+        serializer = self.get_serializer(profile)
+        return self.response_ok(serializer.data)
+
+    def response_ok(self, data):
+        from rest_framework.response import Response
+        return Response(data)

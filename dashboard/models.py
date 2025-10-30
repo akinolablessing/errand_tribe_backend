@@ -326,3 +326,21 @@ class VerificationTask(models.Model):
 
     def __str__(self):
         return self.title
+
+class UserProfile(models.Model):
+    TIER_CHOICES = [
+        ('tier_1', 'Tier 1 - New User'),
+        ('tier_2', 'Tier 2 - Verified User'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    tier = models.CharField(max_length=20, choices=TIER_CHOICES, default='tier_1')
+    errands_completed = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.tier})"
+
+    def update_tier(self):
+        if self.errands_completed >= 3 and self.tier == 'tier_1':
+            self.tier = 'tier_2'
+            self.save()

@@ -46,8 +46,9 @@ THIRD_PARTY_APPS = [
 ]
 LOCAL_APPS = [
     'authentication',
-    'dashboard',
+    # 'dashboard',
     'core',
+    'dashboard.apps.DashboardConfig',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
