@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask, UserProfile
+from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask, UserProfile, \
+    Category, Errand
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -65,3 +66,15 @@ class UserTierSerializer(serializers.ModelSerializer):
 
     def get_errands_left_for_next_tier(self, obj):
         return max(0, 3 - obj.errands_completed)
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ['id', 'name']
+
+class ErrandSerializer(serializers.ModelSerializer):
+    category = CategorySerializer()
+
+    class Meta:
+        model = Errand
+        fields = '__all__'
