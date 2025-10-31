@@ -7,10 +7,11 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask, UserProfile
+from rest_framework import generics, filters, permissions
+from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask, UserProfile, Errand
 
 from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer, \
-    CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer
+    CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer, ErrandSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -372,3 +373,69 @@ class UserTierView(generics.RetrieveAPIView):
     def response_ok(self, data):
         from rest_framework.response import Response
         return Response(data)
+
+class PostedErrandsView(generics.ListAPIView):
+
+    serializer_class = ErrandSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    search_fields = ['title', 'description', 'location']
+    ordering_fields = ['price_min', 'price_max', 'created_at']
+
+    # Swagger query parameters
+    @swagger_auto_schema(
+        operation_summary="List Tasker’s Posted Errands",
+        operation_description=(
+            "Retrieve errands posted by the logged-in tasker. "
+            "Supports filtering by category and sorting by price or date."
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                'category', openapi.IN_QUERY,
+                description="Filter errands by category ID",
+                type=openapi.TYPE_INTEGER
+            ),
+            openapi.Parameter(
+                'ordering', openapi.IN_QUERY,
+                description="Order by price_min, price_max, or created_at",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'search', openapi.IN_QUERY,
+                description="Search errands by title, description, or location",
+                type=openapi.TYPE_STRING
+            ),
+        ],
+        responses={200: ErrandSerializer(many=True)}
+    )
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Errand.objects.filter(user=user)
+
+        category_id = self.request.query_params.get('category')
+        if category_id:
+            queryset = queryset.filter(category__id=category_id)
+
+        return queryset
+
+
+class ErrandDetailView(generics.RetrieveAPIView):
+
+    queryset = Errand.objects.all()
+    serializer_class = ErrandSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+
+    @swagger_auto_schema(
+        operation_summary="Retrieve Full Errand Details",
+        operation_description=(
+            "Get the complete details of a specific errand by its ID. "
+            "Only accessible to authenticated users."
+        ),
+        responses={200: ErrandSerializer()}
+    )
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)

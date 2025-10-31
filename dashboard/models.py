@@ -344,3 +344,25 @@ class UserProfile(models.Model):
         if self.errands_completed >= 3 and self.tier == 'tier_1':
             self.tier = 'tier_2'
             self.save()
+
+class Category(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+
+class Errand(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='errands')
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    location = models.CharField(max_length=255)
+    price_min = models.DecimalField(max_digits=10, decimal_places=2)
+    price_max = models.DecimalField(max_digits=10, decimal_places=2)
+    estimated_duration = models.CharField(max_length=100)
+    deadline = models.DateTimeField()
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='errands')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
