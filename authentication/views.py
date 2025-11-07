@@ -139,6 +139,9 @@ def login_view(request):
             if not getattr(user, field, False):
                 return Response({"success": False, "error": message}, status=403)
 
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
+
         tokens = generate_tokens_for_user(user)
 
         profile_photo_url = None
