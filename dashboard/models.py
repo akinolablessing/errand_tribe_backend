@@ -366,3 +366,24 @@ class Errand(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class RunnerProfile(models.Model):
+
+    TIER_CHOICES = [
+        ('Tier 1', 'Tier 1 - Local Errands'),
+        ('Tier 2', 'Tier 2 - City Errands'),
+        ('Tier 3', 'Tier 3 - Pro Runner'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='runner_profile')
+    tier = models.CharField(max_length=20, choices=TIER_CHOICES, default='Tier 1')
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    rating = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.tier})"
+
+

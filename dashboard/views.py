@@ -11,7 +11,7 @@ from rest_framework import generics, filters, permissions
 from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask, UserProfile, Errand
 
 from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer, \
-    CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer, ErrandSerializer
+    CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer, ErrandSerializer, TaskWithRunnerSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -374,20 +374,30 @@ class UserTierView(generics.RetrieveAPIView):
         from rest_framework.response import Response
         return Response(data)
 
-class PostedErrandsView(generics.ListAPIView):
-
+class PostedErrandsView(generics.ListCreateAPIView):
     serializer_class = ErrandSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.OrderingFilter, filters.SearchFilter]
     search_fields = ['title', 'description', 'location']
     ordering_fields = ['price_min', 'price_max', 'created_at']
 
-    # Swagger query parameters
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Errand.objects.filter(user=user)
+
+        category_id = self.request.query_params.get('category')
+        if category_id:
+            queryset = queryset.filter(category__id=category_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
     @swagger_auto_schema(
-        operation_summary="List Tasker’s Posted Errands",
+        operation_summary="List or Create Tasker’s Posted Errands",
         operation_description=(
-            "Retrieve errands posted by the logged-in tasker. "
-            "Supports filtering by category and sorting by price or date."
+            "GET: Retrieve errands posted by the logged-in tasker.\n"
+            "POST: Create a new errand for the logged-in user."
         ),
         manual_parameters=[
             openapi.Parameter(
@@ -411,15 +421,13 @@ class PostedErrandsView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
-    def get_queryset(self):
-        user = self.request.user
-        queryset = Errand.objects.filter(user=user)
-
-        category_id = self.request.query_params.get('category')
-        if category_id:
-            queryset = queryset.filter(category__id=category_id)
-
-        return queryset
+    @swagger_auto_schema(
+        operation_summary="Create a new Errand",
+        request_body=ErrandSerializer,
+        responses={201: ErrandSerializer}
+    )
+    def post(self, request, *args, **kwargs):
+        return self.create(request, *args, **kwargs)
 
 
 class ErrandDetailView(generics.RetrieveAPIView):
@@ -439,3 +447,171 @@ class ErrandDetailView(generics.RetrieveAPIView):
     )
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
+
+# class RecommendedTasksView(generics.ListAPIView):
+#
+#     serializer_class = TaskWithRunnerSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+#     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+#     search_fields = ['title', 'description', 'location']
+#     ordering_fields = ['price', 'created_at']
+#
+#     @swagger_auto_schema(
+#         operation_description="Get filtered, searchable, and sorted tasks recommended for runners.",
+#         manual_parameters=[
+#             openapi.Parameter(
+#                 'search', openapi.IN_QUERY, description="Search by title or description",
+#                 type=openapi.TYPE_STRING
+#             ),
+#             openapi.Parameter(
+#                 'sort', openapi.IN_QUERY,
+#                 description="Sort by recent, high_price, low_price, or nearby",
+#                 type=openapi.TYPE_STRING
+#             ),
+#             openapi.Parameter(
+#                 'category', openapi.IN_QUERY, description="Filter by category ID",
+#                 type=openapi.TYPE_STRING
+#             ),
+#             openapi.Parameter(
+#                 'location', openapi.IN_QUERY, description="Filter by location",
+#                 type=openapi.TYPE_STRING
+#             ),
+#         ],
+#         responses={200: TaskWithRunnerSerializer(many=True)},
+#     )
+#     def get(self, request, *args, **kwargs):
+#
+#         return self.list(request, *args, **kwargs)
+#
+#     def get_queryset(self):
+#         queryset = Task.objects.filter(status="open")
+#         search = self.request.query_params.get('search')
+#         sort = self.request.query_params.get('sort')
+#         category = self.request.query_params.get('category')
+#         location = self.request.query_params.get('location')
+#
+#         if category:
+#             queryset = queryset.filter(category__id=category)
+#         if location:
+#             queryset = queryset.filter(location__icontains=location)
+#         if search:
+#             queryset = queryset.filter(title__icontains=search)
+#
+#         if sort == "recent":
+#             queryset = queryset.order_by("-created_at")
+#         elif sort == "high_price":
+#             queryset = queryset.order_by("-price")
+#         elif sort == "low_price":
+#             queryset = queryset.order_by("price")
+#         elif sort == "nearby":
+#             pass
+#
+#         return queryset
+#
+
+class RecommendedTasksView(generics.ListAPIView):
+
+    serializer_class = ErrandSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'description', 'location']
+    ordering_fields = ['price_min', 'price_max', 'created_at']
+
+    @swagger_auto_schema(
+        operation_summary="Get recommended errands",
+        operation_description=(
+            "Retrieve errands that are currently open or available for runners.\n"
+            "You can filter by category, search by title/description/location, "
+            "and sort by recent or price range."
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                'search', openapi.IN_QUERY,
+                description="Search errands by title, description, or location",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'sort', openapi.IN_QUERY,
+                description="Sort by recent, high_price, low_price, or nearby",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'category', openapi.IN_QUERY,
+                description="Filter errands by category ID",
+                type=openapi.TYPE_INTEGER
+            ),
+            openapi.Parameter(
+                'location', openapi.IN_QUERY,
+                description="Filter errands by location",
+                type=openapi.TYPE_STRING
+            ),
+        ],
+        responses={200: ErrandSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = Errand.objects.all().order_by("-created_at")
+        search = self.request.query_params.get("search")
+        sort = self.request.query_params.get("sort")
+        category = self.request.query_params.get("category")
+        location = self.request.query_params.get("location")
+
+        if category:
+            queryset = queryset.filter(category__id=category)
+
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+
+        if search:
+            queryset = queryset.filter(
+                title__icontains=search
+            ) | queryset.filter(description__icontains=search)
+
+        if sort == "recent":
+            queryset = queryset.order_by("-created_at")
+        elif sort == "high_price":
+            queryset = queryset.order_by("-price_max")
+        elif sort == "low_price":
+            queryset = queryset.order_by("price_min")
+
+        return queryset
+class AvailableTasksView(generics.ListAPIView):
+
+    serializer_class = ErrandSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="List Available Errands",
+        operation_description="Retrieve all available errands (open errands not created by the logged-in user).",
+        manual_parameters=[
+            openapi.Parameter(
+                'category', openapi.IN_QUERY,
+                description="Filter errands by category ID",
+                type=openapi.TYPE_INTEGER
+            ),
+            openapi.Parameter(
+                'location', openapi.IN_QUERY,
+                description="Filter errands by location name (case-insensitive)",
+                type=openapi.TYPE_STRING
+            ),
+        ],
+        responses={200: ErrandSerializer(many=True)}
+    )
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Errand.objects.exclude(user=user).order_by('-created_at')
+
+        category_id = self.request.query_params.get('category')
+        location = self.request.query_params.get('location')
+
+        if category_id:
+            queryset = queryset.filter(category__id=category_id)
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+
+        return queryset

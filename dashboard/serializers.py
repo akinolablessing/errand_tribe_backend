@@ -72,9 +72,52 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'name']
 
+# class ErrandSerializer(serializers.ModelSerializer):
+#     category = CategorySerializer()
+#
+#     class Meta:
+#         model = Errand
+#         fields = '__all__'
+#         read_only_fields = ['user', 'created_at']
+
 class ErrandSerializer(serializers.ModelSerializer):
     category = CategorySerializer()
 
     class Meta:
         model = Errand
         fields = '__all__'
+        read_only_fields = ['user', 'created_at']
+
+    def create(self, validated_data):
+        category_data = validated_data.pop('category', None)
+        if category_data:
+            category, _ = Category.objects.get_or_create(**category_data)
+            validated_data['category'] = category
+
+        return Errand.objects.create(**validated_data)
+class RunnerProfileSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    errands_left_for_next_tier = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            'id',
+            'user_name',
+            'tier',
+            'errands_completed',
+            'errands_left_for_next_tier',
+            'latitude',
+            'longitude',
+            'rating',
+        ]
+
+    def get_errands_left_for_next_tier(self, obj):
+        return max(0, 3 - obj.errands_completed)
+
+class TaskWithRunnerSerializer(TaskSerializer):
+    runner_profile = RunnerProfileSerializer(source='assigned_runner.profile', read_only=True)
+
+    class Meta(TaskSerializer.Meta):
+        fields = TaskSerializer.Meta.fields + ['runner_profile']
+
