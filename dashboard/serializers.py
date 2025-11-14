@@ -1,3 +1,6 @@
+from django.utils import timezone
+
+
 from rest_framework import serializers
 from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask, UserProfile, \
     Category, Errand
@@ -81,20 +84,43 @@ class CategorySerializer(serializers.ModelSerializer):
 #         read_only_fields = ['user', 'created_at']
 
 class ErrandSerializer(serializers.ModelSerializer):
-    category = CategorySerializer()
+    client = serializers.SerializerMethodField()
+    price_range = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', read_only=True)
 
     class Meta:
         model = Errand
-        fields = '__all__'
-        read_only_fields = ['user', 'created_at']
+        fields = [
+            "id",
+            "title",
+            "description",
+            "location",
+            "estimated_duration",
+            "price_min",
+            "price_max",
+            "price_range",
+            "deadline",
+            "client",
+            "category_name",
+            "is_overdue",
+            "created_at",
+        ]
 
-    def create(self, validated_data):
-        category_data = validated_data.pop('category', None)
-        if category_data:
-            category, _ = Category.objects.get_or_create(**category_data)
-            validated_data['category'] = category
+    def get_client(self, obj):
+        user = obj.user
+        full_name = f"{user.first_name} {user.last_name}".strip()
 
-        return Errand.objects.create(**validated_data)
+        return full_name if full_name else user.email
+
+    def get_price_range(self, obj):
+        return f"₦{float(obj.price_min):,.2f} - ₦{float(obj.price_max):,.2f}"
+
+    def get_is_overdue(self, obj):
+        if not obj.deadline:
+            return False
+        return timezone.now() > obj.deadline
+
 class RunnerProfileSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.username', read_only=True)
     errands_left_for_next_tier = serializers.SerializerMethodField()
