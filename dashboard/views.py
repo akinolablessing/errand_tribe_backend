@@ -8,10 +8,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import generics, filters, permissions
-from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask, UserProfile, Errand
+from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask, UserProfile, Errand, \
+    ErrandApplication
 
 from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer, \
-    CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer, ErrandSerializer, TaskWithRunnerSerializer
+    CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer, ErrandSerializer, TaskWithRunnerSerializer, \
+    ErrandApplicationSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -615,3 +617,47 @@ class AvailableTasksView(generics.ListAPIView):
             queryset = queryset.filter(location__icontains=location)
 
         return queryset
+
+class ApplyErrandView(generics.CreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ErrandApplicationSerializer
+
+    @swagger_auto_schema(operation_summary="Apply to an Errand")
+    def post(self, request, errand_id):
+        errand = Errand.objects.get(id=errand_id)
+
+        # Check if user already applied
+        if ErrandApplication.objects.filter(errand=errand, runner=request.user).exists():
+            return Response({"detail": "You have already applied for this errand."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(runner=request.user, errand=errand)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ErrandApplicationsListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ErrandApplicationSerializer
+
+    @swagger_auto_schema(operation_summary="List Applications for an Errand")
+    def get_queryset(self):
+        errand_id = self.kwargs['errand_id']
+        return ErrandApplication.objects.filter(errand_id=errand_id)
+
+
+class UpdateApplicationStatusView(generics.UpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ErrandApplicationSerializer
+    lookup_url_kwarg = "application_id"
+
+    @swagger_auto_schema(operation_summary="Accept or Reject an Application")
+    def patch(self, request, *args, **kwargs):
+        application = self.get_object()
+        status_value = request.data.get("status")
+        if status_value not in ["accepted", "rejected"]:
+            return Response({"detail": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
+
+        application.status = status_value
+        application.save()
+        return Response({"detail": f"Application {status_value} successfully."})

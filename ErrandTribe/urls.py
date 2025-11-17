@@ -33,7 +33,8 @@ from django.conf.urls.static import static
 
 from dashboard.views import CreateTaskView, SupermarketRunCreateView, StartTaskJourneyView, PickupDeliveryCreateView, \
     ErrandImageUploadView, CareTaskCreateView, VerificationTaskCreateView, UserTierView, PostedErrandsView, \
-    ErrandDetailView, RecommendedTasksView, AvailableTasksView
+    ErrandDetailView, RecommendedTasksView, AvailableTasksView, ApplyErrandView, ErrandApplicationsListView, \
+    UpdateApplicationStatusView
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -106,6 +107,9 @@ urlpatterns = [
     path('api/tasks/recommended/', RecommendedTasksView.as_view(), name='recommended-tasks'),
     path('api/tasks/available/', AvailableTasksView.as_view(), name='available-tasks'),
 
+    path('errands/<uuid:errand_id>/apply/', ApplyErrandView.as_view(), name='apply-errand'),
+    path('errands/<uuid:errand_id>/applications/', ErrandApplicationsListView.as_view(), name='errand-applications'),
+    path('applications/<uuid:application_id>/status/', UpdateApplicationStatusView.as_view(), name='update-application-status'),
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
 

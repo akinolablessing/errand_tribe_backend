@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from rest_framework import serializers
 from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask, UserProfile, \
-    Category, Errand
+    Category, Errand, ErrandApplication
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -147,3 +147,22 @@ class TaskWithRunnerSerializer(TaskSerializer):
     class Meta(TaskSerializer.Meta):
         fields = TaskSerializer.Meta.fields + ['runner_profile']
 
+
+class ErrandApplicationSerializer(serializers.ModelSerializer):
+    runner_name = serializers.CharField(source="runner.username", read_only=True)
+    errand_title = serializers.CharField(source="errand.title", read_only=True)
+
+    class Meta:
+        model = ErrandApplication
+        fields = [
+            "id",
+            "errand",
+            "errand_title",
+            "runner",
+            "runner_name",
+            "offer_amount",
+            "message",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["status", "created_at", "runner_name", "errand_title"]
