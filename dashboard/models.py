@@ -94,8 +94,6 @@ class Task(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
-    
-
     def assign_worker(self, worker):
 
         self.worker = worker
@@ -174,31 +172,6 @@ class TaskStatistic(models.Model):
             self.success_rate = (self.total_tasks_completed / self.total_tasks_posted) * 100
         else:
             self.success_rate = 0
-        self.save()
-
-
-    def update_all_statistics(self):
-        """Update all statistics based on current task data"""
-        tasks = self.user.posted_tasks.all()
-        completed_tasks = tasks.filter(status=Task.Status.COMPLETED)
-        
-        # Basic counts
-        self.total_tasks_posted = tasks.count()
-        self.total_tasks_completed = completed_tasks.count()
-        
-        # Success rate
-        if self.total_tasks_posted > 0:
-            self.success_rate = (self.total_tasks_completed / self.total_tasks_posted) * 100
-        else:
-            self.success_rate = 0
-        
-        # Average cost
-        if completed_tasks.count() > 0:
-            avg_cost = completed_tasks.aggregate(avg=Avg('price'))['avg'] or 0
-            self.average_cost_per_errand = avg_cost
-        else:
-            self.average_cost_per_errand = 0
-            
         self.save()
 
     def __str__(self):

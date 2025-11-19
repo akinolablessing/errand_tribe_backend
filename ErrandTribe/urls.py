@@ -115,7 +115,6 @@ urlpatterns = [
     path("health/", health_check, name="health-check"),
 
     path("auth/", include("authentication.urls")),
-    path("dashboard/", include("dashboard.urls")),
 
 
 ]
