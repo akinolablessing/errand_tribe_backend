@@ -111,8 +111,8 @@ urlpatterns = [
     path('errands/<uuid:errand_id>/applications/', ErrandApplicationsListView.as_view(), name='errand-applications'),
     path('applications/<uuid:application_id>/status/', UpdateApplicationStatusView.as_view(), name='update-application-status'),
 
-    path("applications/<int:application_id>/review/", ReviewRunnerView.as_view(), name="review-runner"),
-    path("applications/<int:application_id>/runner-details/",AppliedRunnerDetailsView.as_view(),name="runner-details"),
+    path("applications/<uuid:application_id>/review/", ReviewRunnerView.as_view(), name="review-runner"),
+    path("applications/<uuid:application_id>/runner-details/",AppliedRunnerDetailsView.as_view(),name="runner-details"),
     re_path(r"^docs/swagger(?P<format>\.json|\.yaml)$",
             schema_view.without_ui(cache_timeout=0), name="schema-json"),
 

@@ -192,13 +192,13 @@ class ErrandApplicationSerializer(serializers.ModelSerializer):
         read_only_fields = ["status", "created_at", "runner_name", "errand_title"]
 
 class ReviewSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
     runner_name = serializers.CharField(source="errand.runner.username", read_only=True)
 
     class Meta:
         model = Review
         fields = ["id", "rating", "comment", "runner_name", "created_at"]
 
-from rest_framework import serializers
 
 class RunnerProfileMiniSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
@@ -221,6 +221,7 @@ class RunnerProfileMiniSerializer(serializers.ModelSerializer):
 
 
 class RunnerDetailsSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
     runner_profile = serializers.SerializerMethodField()
     errand_title = serializers.CharField(source="errand.title", read_only=True)
 
