@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from rest_framework import serializers
 from .models import Task, SupermarketRun, PickupDelivery, ErrandImage, CareTask, VerificationTask, UserProfile, \
-    Category, Errand, ErrandApplication
+    Category, Errand, ErrandApplication, Review
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -89,6 +89,10 @@ class ErrandSerializer(serializers.ModelSerializer):
     is_overdue = serializers.SerializerMethodField()
     category_name = serializers.CharField(source='category.name', read_only=True)
 
+    applications_count = serializers.SerializerMethodField()
+    applications = serializers.SerializerMethodField()
+    has_applied = serializers.SerializerMethodField()
+
     class Meta:
         model = Errand
         fields = [
@@ -105,12 +109,15 @@ class ErrandSerializer(serializers.ModelSerializer):
             "category_name",
             "is_overdue",
             "created_at",
+
+            "applications_count",
+            "applications",
+            "has_applied",
         ]
 
     def get_client(self, obj):
         user = obj.user
         full_name = f"{user.first_name} {user.last_name}".strip()
-
         return full_name if full_name else user.email
 
     def get_price_range(self, obj):
@@ -120,6 +127,23 @@ class ErrandSerializer(serializers.ModelSerializer):
         if not obj.deadline:
             return False
         return timezone.now() > obj.deadline
+
+
+    def get_applications_count(self, obj):
+        return obj.applications.count()
+
+    def get_applications(self, obj):
+        request = self.context.get("request")
+        queryset = obj.applications.all()
+        return ErrandApplicationSerializer(queryset, many=True, context={"request": request}).data
+
+    def get_has_applied(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+
+        return obj.applications.filter(runner=request.user).exists()
+
 
 class RunnerProfileSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.username', read_only=True)
@@ -166,3 +190,52 @@ class ErrandApplicationSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["status", "created_at", "runner_name", "errand_title"]
+
+class ReviewSerializer(serializers.ModelSerializer):
+    runner_name = serializers.CharField(source="errand.runner.username", read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ["id", "rating", "comment", "runner_name", "created_at"]
+
+from rest_framework import serializers
+
+class RunnerProfileMiniSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            "full_name",
+            "tier",
+            "rating",
+            "latitude",
+            "longitude",
+            "errands_completed",
+        ]
+
+    def get_full_name(self, obj):
+        user = obj.user
+        name = f"{user.first_name} {user.last_name}".strip()
+        return name if name else user.username
+
+
+class RunnerDetailsSerializer(serializers.ModelSerializer):
+    runner_profile = serializers.SerializerMethodField()
+    errand_title = serializers.CharField(source="errand.title", read_only=True)
+
+    class Meta:
+        model = ErrandApplication
+        fields = [
+            "id",
+            "errand_title",
+            "offer_amount",
+            "message",
+            "status",
+            "created_at",
+            "runner_profile",
+        ]
+
+    def get_runner_profile(self, obj):
+        profile = obj.runner.profile
+        return RunnerProfileMiniSerializer(profile).data

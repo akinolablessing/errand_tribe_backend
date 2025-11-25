@@ -1,5 +1,10 @@
+from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics
+from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import generics, permissions, status
@@ -9,11 +14,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import generics, filters, permissions
 from .models import Task, Escrow, ErrandImage, PickupDelivery, CareTask, VerificationTask, UserProfile, Errand, \
-    ErrandApplication
+    ErrandApplication, Review
 
 from .serializers import TaskSerializer, SupermarketRunSerializer, PickupDeliverySerializer, ErrandImageSerializer, \
     CareTaskSerializer, VerificationTaskSerializer, UserTierSerializer, ErrandSerializer, TaskWithRunnerSerializer, \
-    ErrandApplicationSerializer
+    ErrandApplicationSerializer, ReviewSerializer, RunnerDetailsSerializer
 
 
 class CreateTaskView(generics.CreateAPIView):
@@ -383,6 +388,12 @@ class PostedErrandsView(generics.ListCreateAPIView):
     search_fields = ['title', 'description', 'location']
     ordering_fields = ['price_min', 'price_max', 'created_at']
 
+
+    def get_serializer_context(self):
+        return {
+            "request": self.request
+        }
+
     def get_queryset(self):
         user = self.request.user
         queryset = Errand.objects.filter(user=user)
@@ -390,10 +401,12 @@ class PostedErrandsView(generics.ListCreateAPIView):
         category_id = self.request.query_params.get('category')
         if category_id:
             queryset = queryset.filter(category__id=category_id)
+
         return queryset
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
 
     @swagger_auto_schema(
         operation_summary="List or Create Tasker’s Posted Errands",
@@ -433,11 +446,16 @@ class PostedErrandsView(generics.ListCreateAPIView):
 
 
 class ErrandDetailView(generics.RetrieveAPIView):
-
     queryset = Errand.objects.all()
     serializer_class = ErrandSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'id'
+
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
     @swagger_auto_schema(
         operation_summary="Retrieve Full Errand Details",
@@ -450,74 +468,21 @@ class ErrandDetailView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-# class RecommendedTasksView(generics.ListAPIView):
-#
-#     serializer_class = TaskWithRunnerSerializer
-#     permission_classes = [permissions.IsAuthenticated]
-#     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-#     search_fields = ['title', 'description', 'location']
-#     ordering_fields = ['price', 'created_at']
-#
-#     @swagger_auto_schema(
-#         operation_description="Get filtered, searchable, and sorted tasks recommended for runners.",
-#         manual_parameters=[
-#             openapi.Parameter(
-#                 'search', openapi.IN_QUERY, description="Search by title or description",
-#                 type=openapi.TYPE_STRING
-#             ),
-#             openapi.Parameter(
-#                 'sort', openapi.IN_QUERY,
-#                 description="Sort by recent, high_price, low_price, or nearby",
-#                 type=openapi.TYPE_STRING
-#             ),
-#             openapi.Parameter(
-#                 'category', openapi.IN_QUERY, description="Filter by category ID",
-#                 type=openapi.TYPE_STRING
-#             ),
-#             openapi.Parameter(
-#                 'location', openapi.IN_QUERY, description="Filter by location",
-#                 type=openapi.TYPE_STRING
-#             ),
-#         ],
-#         responses={200: TaskWithRunnerSerializer(many=True)},
-#     )
-#     def get(self, request, *args, **kwargs):
-#
-#         return self.list(request, *args, **kwargs)
-#
-#     def get_queryset(self):
-#         queryset = Task.objects.filter(status="open")
-#         search = self.request.query_params.get('search')
-#         sort = self.request.query_params.get('sort')
-#         category = self.request.query_params.get('category')
-#         location = self.request.query_params.get('location')
-#
-#         if category:
-#             queryset = queryset.filter(category__id=category)
-#         if location:
-#             queryset = queryset.filter(location__icontains=location)
-#         if search:
-#             queryset = queryset.filter(title__icontains=search)
-#
-#         if sort == "recent":
-#             queryset = queryset.order_by("-created_at")
-#         elif sort == "high_price":
-#             queryset = queryset.order_by("-price")
-#         elif sort == "low_price":
-#             queryset = queryset.order_by("price")
-#         elif sort == "nearby":
-#             pass
-#
-#         return queryset
-#
+
+
 
 class RecommendedTasksView(generics.ListAPIView):
-
     serializer_class = ErrandSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'description', 'location']
     ordering_fields = ['price_min', 'price_max', 'created_at']
+
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
     @swagger_auto_schema(
         operation_summary="Get recommended errands",
@@ -534,7 +499,7 @@ class RecommendedTasksView(generics.ListAPIView):
             ),
             openapi.Parameter(
                 'sort', openapi.IN_QUERY,
-                description="Sort by recent, high_price, low_price, or nearby",
+                description="Sort by recent, high_price, or low_price",
                 type=openapi.TYPE_STRING
             ),
             openapi.Parameter(
@@ -554,7 +519,8 @@ class RecommendedTasksView(generics.ListAPIView):
         return self.list(request, *args, **kwargs)
 
     def get_queryset(self):
-        queryset = Errand.objects.all().order_by("-created_at")
+        queryset = Errand.objects.exclude(user=self.request.user).order_by("-created_at")
+
         search = self.request.query_params.get("search")
         sort = self.request.query_params.get("sort")
         category = self.request.query_params.get("category")
@@ -568,8 +534,8 @@ class RecommendedTasksView(generics.ListAPIView):
 
         if search:
             queryset = queryset.filter(
-                title__icontains=search
-            ) | queryset.filter(description__icontains=search)
+                Q(title__icontains=search) | Q(description__icontains=search)
+            )
 
         if sort == "recent":
             queryset = queryset.order_by("-created_at")
@@ -579,10 +545,15 @@ class RecommendedTasksView(generics.ListAPIView):
             queryset = queryset.order_by("price_min")
 
         return queryset
-class AvailableTasksView(generics.ListAPIView):
 
+class AvailableTasksView(generics.ListAPIView):
     serializer_class = ErrandSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
     @swagger_auto_schema(
         operation_summary="List Available Errands",
@@ -606,13 +577,19 @@ class AvailableTasksView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Errand.objects.exclude(user=user).order_by('-created_at')
+
+        queryset = (
+            Errand.objects
+            .exclude(user=user)
+            .order_by('-created_at')
+        )
 
         category_id = self.request.query_params.get('category')
         location = self.request.query_params.get('location')
 
         if category_id:
             queryset = queryset.filter(category__id=category_id)
+
         if location:
             queryset = queryset.filter(location__icontains=location)
 
@@ -624,17 +601,32 @@ class ApplyErrandView(generics.CreateAPIView):
 
     @swagger_auto_schema(operation_summary="Apply to an Errand")
     def post(self, request, errand_id):
-        errand = Errand.objects.get(id=errand_id)
+        errand = get_object_or_404(Errand, id=errand_id)
 
-        # Check if user already applied
+        if errand.user == request.user:
+            return Response(
+                {"detail": "You cannot apply to your own errand."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if ErrandApplication.objects.filter(errand=errand, runner=request.user).exists():
-            return Response({"detail": "You have already applied for this errand."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "You have already applied for this errand."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(
+            data=request.data,
+            context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
-        serializer.save(runner=request.user, errand=errand)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+        serializer.save(
+            runner=request.user,
+            errand=errand
+        )
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class ErrandApplicationsListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -661,3 +653,111 @@ class UpdateApplicationStatusView(generics.UpdateAPIView):
         application.status = status_value
         application.save()
         return Response({"detail": f"Application {status_value} successfully."})
+
+class ReviewRunnerView(generics.CreateAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Review a runner for a completed application",
+        operation_description=(
+            "Allows the tasker to submit a review for a runner who completed an errand.\n"
+            "The review can only be submitted once per completed application."
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                name='application_id',
+                in_=openapi.IN_PATH,
+                description='ID of the ErrandApplication to review',
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        request_body=ReviewSerializer,
+        responses={
+            201: openapi.Response(
+                description="Review created successfully",
+                schema=ReviewSerializer()
+            ),
+            400: "Invalid request or application not completed",
+            403: "Unauthorized to review this runner",
+            404: "Application not found"
+        }
+    )
+    def post(self, request, application_id):
+        application = get_object_or_404(ErrandApplication, id=application_id)
+
+        if application.errand.user != request.user:
+            return Response(
+                {"detail": "You cannot review this application."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if application.status != "completed":
+            return Response(
+                {"detail": "You can only review completed tasks."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if hasattr(application, "review"):
+            return Response(
+                {"detail": "You have already reviewed this runner."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = ReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        review = serializer.save(errand=application, reviewer=request.user)
+
+        profile = application.runner.profile
+        all_reviews = Review.objects.filter(errand__runner=application.runner)
+        total = sum(r.rating for r in all_reviews)
+        count = all_reviews.count()
+        profile.rating = total / count
+        profile.save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AppliedRunnerDetailsView(generics.RetrieveAPIView):
+    serializer_class = RunnerDetailsSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_url_kwarg = "application_id"
+
+    @swagger_auto_schema(
+        operation_summary="Get details of an applied runner",
+        operation_description=(
+            "Retrieve the full profile of a runner who applied to an errand. "
+            "Only accessible to the tasker who posted the errand."
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                name='application_id',
+                in_=openapi.IN_PATH,
+                description='ID of the ErrandApplication',
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Applied runner details",
+                schema=RunnerDetailsSerializer()
+            ),
+            403: "Permission denied",
+            404: "Application not found"
+        }
+    )
+    def get_object(self):
+        application_id = self.kwargs.get(self.lookup_url_kwarg)
+        application = get_object_or_404(ErrandApplication, id=application_id)
+
+        if application.errand.user != self.request.user:
+            raise PermissionDenied("You do not have access to this runner's details.")
+
+        return application
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
