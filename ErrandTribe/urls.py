@@ -102,7 +102,7 @@ urlpatterns = [
 
     path('posted-errands/', PostedErrandsView.as_view(), name='posted-errands'),
 
-    path('errand/<int:id>/', ErrandDetailView.as_view(), name='errand-detail'),
+    path('errand/<uuid:id>/', ErrandDetailView.as_view(), name='errand-detail'),
 
     path('api/tasks/recommended/', RecommendedTasksView.as_view(), name='recommended-tasks'),
     path('api/tasks/available/', AvailableTasksView.as_view(), name='available-tasks'),

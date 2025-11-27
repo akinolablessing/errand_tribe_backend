@@ -84,6 +84,7 @@ class CategorySerializer(serializers.ModelSerializer):
 #         read_only_fields = ['user', 'created_at']
 
 class ErrandSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
     client = serializers.SerializerMethodField()
     price_range = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
