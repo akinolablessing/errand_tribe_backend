@@ -125,13 +125,14 @@ class StartTaskJourneyView(APIView):
         operation_description=(
             "This endpoint initializes the user's task journey. "
             "If the user has not posted any task yet, it prompts them to post their first task. "
-            "If they already have tasks, it returns a summary of their most recent ones."
+            "If they already have tasks, it returns only the most recent task as a flat object."
         ),
         responses={
             200: openapi.Response(
-                description="Journey started or existing tasks returned",
+                description="Journey started or latest task returned",
                 examples={
                     "application/json": {
+                        "success": True,
                         "message": "Welcome! You have not posted any task yet.",
                         "action": "Click 'Post a Task' to create your first one."
                     }
@@ -150,17 +151,18 @@ class StartTaskJourneyView(APIView):
                 {
                     "success": True,
                     "message": "Welcome! You have not posted any task yet.",
-                    "action": "Click 'Post a Task' to create your first one.",
+                    "action": "Click 'Post a Task' to create your first one."
                 },
-                status=status.HTTP_200_OK,
+                status=status.HTTP_200_OK
             )
 
-        serializer = TaskSerializer(user_tasks, many=True)
+        latest_task = TaskSerializer(user_tasks.first()).data
+
         return Response(
             {
                 "success": True,
                 "message": "You already have posted tasks.",
-                "tasks": serializer.data,
+                "task": latest_task
             },
             status=status.HTTP_200_OK,
         )
